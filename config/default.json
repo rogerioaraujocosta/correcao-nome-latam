@@ -55,7 +55,7 @@
         "await": {
           "mode": "contains",
           "anyOf": [
-            "Perfeito! Vou ajudá-lo a corrigir o nome na sua reserva. Para validar sua identidade, preciso de um dos seguintes dados:"
+            "Para validar sua identidade"
           ]
         },
         "send": {

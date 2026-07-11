@@ -359,14 +359,14 @@ Para uma alteração pessoal, edite o `config.json` privado, não `config/defaul
 | Passo | Quando é liberado | Ação |
 | --- | --- | --- |
 | `hello` | Trabalho criado e WhatsApp conectado | Envia `Olá` |
-| `reason` | Mensagem da LATAM iniciada por “Perfeito! Vou ajudá-lo...” e solicitação de identidade | Envia o motivo da correção |
+| `reason` | Mensagem da LATAM que contém “Para validar sua identidade” | Envia o motivo da correção |
 | `pnr` | Próxima resposta | Envia `{{pnr}}` |
 | `current_name` | Próxima resposta | Envia `{{currentName}}` |
 | `correct_name` | Próxima resposta | Envia `{{correctName}}` |
 | `confirmation` | Próxima resposta | Envia `SIM` |
 | `final_confirmation` | Próxima resposta | Conclui o trabalho |
 
-Cada mensagem recebida libera no máximo um passo. O aviso “Obrigado por aguardar na linha. Estou processando sua solicitação...” é ignorado no passo `reason`; somente a mensagem da LATAM que oferece ajuda e solicita um dado de identidade libera o envio do motivo. Os passos seguintes ainda usam `any_inbound`. Se o menu da LATAM mudar, revise os matchers com `npm run workflow:edit`.
+Cada mensagem recebida libera no máximo um passo. O aviso “Obrigado por aguardar na linha. Estou processando sua solicitação...” é ignorado no passo `reason`; somente uma mensagem que contenha o trecho invariável “Para validar sua identidade” libera o envio do motivo. A comparação ignora caixa, acentos e variações de espaços/quebras de linha. Os passos seguintes ainda usam `any_inbound`. Se o menu da LATAM mudar, revise os matchers com `npm run workflow:edit`.
 
 ### Regras condicionais globais
 

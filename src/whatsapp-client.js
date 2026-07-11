@@ -367,6 +367,18 @@ function forceSilentLogger(logger) {
 	return pino({ level: 'silent' })
 }
 
+const LIBSIGNAL_LOG_FILTER = Symbol.for('latam-name-bot.libsignal-log-filter')
+
+export function suppressUnsafeLibsignalLogs(consoleObject = console) {
+	if (consoleObject[LIBSIGNAL_LOG_FILTER]) return
+	const originalInfo = consoleObject.info.bind(consoleObject)
+	consoleObject.info = (...arguments_) => {
+		if (arguments_[0] === 'Closing session:') return
+		originalInfo(...arguments_)
+	}
+	Object.defineProperty(consoleObject, LIBSIGNAL_LOG_FILTER, { value: true })
+}
+
 /**
  * Small, single-session Baileys client. The flow/state engine is deliberately
  * external; this class only transports filtered real-time messages.
@@ -384,6 +396,7 @@ export class WhatsAppClient extends EventEmitter {
 		onOwnMessage,
 		onQr,
 		onError,
+		onDiagnostic,
 		output = process.stdout,
 		logger,
 		socketFactory = makeWASocket,
@@ -413,6 +426,7 @@ export class WhatsAppClient extends EventEmitter {
 		this._onOwnMessage = this._optionalCallback(onOwnMessage, 'onOwnMessage')
 		this._onQr = this._optionalCallback(onQr, 'onQr')
 		this._onError = this._optionalCallback(onError, 'onError')
+		this._onDiagnostic = this._optionalCallback(onDiagnostic, 'onDiagnostic')
 		this._output = output
 		this._logger = forceSilentLogger(logger)
 		this._socketFactory = socketFactory
@@ -432,6 +446,7 @@ export class WhatsAppClient extends EventEmitter {
 		this._started = false
 		this._intentionalStop = false
 		this._connection = 'close'
+		suppressUnsafeLibsignalLogs()
 
 		this.targetNumber = undefined
 		this.targetJid = undefined
@@ -724,9 +739,15 @@ export class WhatsAppClient extends EventEmitter {
 				this.emit('own-message', ownMessage)
 				continue
 			}
-			if (!(await messageMatchesTarget(message, this.targetNumber, socket))) continue
+			if (!(await messageMatchesTarget(message, this.targetNumber, socket))) {
+				if (this._onDiagnostic) await this._onDiagnostic({ reason: 'target_mismatch' })
+				continue
+			}
 			const inbound = toInboundMessage(message, this.targetNumber, observedAt)
-			if (!inbound) continue
+			if (!inbound) {
+				if (this._onDiagnostic) await this._onDiagnostic({ reason: 'unsupported_content' })
+				continue
+			}
 
 			if (this._onMessage) {
 				await this._onMessage(inbound)

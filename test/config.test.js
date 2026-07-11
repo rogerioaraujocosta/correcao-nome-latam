@@ -42,7 +42,7 @@ test('a configuração padrão descreve exatamente o fluxo atual', async () => {
   assert.equal(config.workflow.steps[0].await.mode, 'job_created')
   assert.equal(config.workflow.steps[0].send.value, 'Olá')
   assert.equal(config.workflow.steps[1].await.mode, 'contains')
-  assert.match(config.workflow.steps[1].await.anyOf[0], /validar sua identidade/)
+  assert.equal(config.workflow.steps[1].await.anyOf[0], 'Para validar sua identidade')
   assert.equal(config.workflow.inboundRules[0].id, 'infant_agent_handoff')
   assert.deepEqual(config.workflow.inboundRules[0].match.allOf.length, 2)
   assert.equal(config.workflow.inboundRules[0].send.value, 'Sim')

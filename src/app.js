@@ -68,7 +68,12 @@ export async function startBot({
       },
       onMessage: async (message) => {
         try {
-          await engine?.handleInbound(message)
+          const result = await engine?.handleInbound(message)
+          if (result?.accepted) {
+            logger.info({ event: 'inbound_accepted', stepId: result.stepId, ruleId: result.ruleId }, 'Resposta da LATAM aceita pelo fluxo')
+          } else {
+            logger.info({ event: 'inbound_ignored', reason: result?.reason }, 'Resposta da LATAM recebida, mas não liberou o passo')
+          }
         } catch (error) {
           logger.error({ error: redactError(error) }, 'Falha ao avançar o fluxo; o trabalho foi preservado')
         }
@@ -81,6 +86,7 @@ export async function startBot({
         }
       },
       onError: ({ code }) => logger.warn({ code }, 'Evento interno do transporte WhatsApp'),
+      onDiagnostic: ({ reason }) => logger.info({ event: 'whatsapp_message_ignored', reason }, 'Evento do WhatsApp ignorado antes do workflow'),
     })
 
     engine = new WorkflowEngine({ store, whatsapp, config, logger })

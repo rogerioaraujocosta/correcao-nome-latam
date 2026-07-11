@@ -13,6 +13,7 @@ import {
   messageMatchesTarget,
   normalizePhoneNumber,
   phoneNumberToJid,
+  suppressUnsafeLibsignalLogs,
 } from '../src/whatsapp-client.js'
 
 const TARGET_NUMBER = '5511999999999'
@@ -92,6 +93,7 @@ function createHarness(options = {}) {
     onConnectionChange: options.onConnectionChange,
     onMessage: options.onMessage,
     onError: options.onError,
+    onDiagnostic: options.onDiagnostic,
     authStateFactory: async (directory) => {
       authCalls.push(directory)
       return {
@@ -165,6 +167,15 @@ test('normaliza numero, classifica desconexoes e calcula backoff deterministico'
   }), 80)
 })
 
+test('suprime dump criptográfico do libsignal sem ocultar outros avisos', () => {
+  const received = []
+  const fakeConsole = { info: (...arguments_) => received.push(arguments_) }
+  suppressUnsafeLibsignalLogs(fakeConsole)
+  fakeConsole.info('Closing session:', { segredo: true })
+  fakeConsole.info('mensagem operacional', { ok: true })
+  assert.deepEqual(received, [['mensagem operacional', { ok: true }]])
+})
+
 test('filtra PN, remoteJidAlt e LID sem aceitar grupo, remetente errado ou mensagem propria', async () => {
   assert.equal(await messageMatchesTarget(createMessage(), TARGET_NUMBER), true)
   assert.equal(await messageMatchesTarget(createMessage({
@@ -196,8 +207,10 @@ test('filtra PN, remoteJidAlt e LID sem aceitar grupo, remetente errado ou mensa
 test('processa somente notify elegivel do alvo e entrega o envelope do engine', async () => {
   const received = []
   const emitted = []
+  const diagnostics = []
   const harness = createHarness({
     onMessage: async (message) => received.push(message),
+    onDiagnostic: async (diagnostic) => diagnostics.push(diagnostic),
   })
   harness.client.on('message', (message) => emitted.push(message))
 
@@ -247,6 +260,10 @@ test('processa somente notify elegivel do alvo e entrega o envelope do engine', 
   assert.equal(received[0].eligible, true)
   assert.equal(Number.isNaN(Date.parse(received[0].observedAt)), false)
   assert.deepEqual(emitted, received)
+  assert.deepEqual(diagnostics, [
+    { reason: 'target_mismatch' },
+    { reason: 'unsupported_content' },
+  ])
 
   await harness.client.stop()
 })
