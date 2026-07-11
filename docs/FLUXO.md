@@ -102,7 +102,7 @@ Depois de observar as respostas reais, substitua cada `any_inbound` por `contain
 
 Antes de comparar, o engine limita o texto a 4096 caracteres e normaliza Unicode, caixa, espaços e acentos. Expressões inválidas, maiores que 500 caracteres ou classificadas como inseguras por `safe-regex2` fazem a configuração falhar antes do bot iniciar.
 
-## Correlação, fila e deduplicação
+## Correlação, substituição e deduplicação
 
 Uma mensagem recebida só pode avançar o trabalho quando todas estas condições forem verdadeiras:
 
@@ -113,7 +113,7 @@ Uma mensagem recebida só pode avançar o trabalho quando todas estas condiçõe
 5. Seu identificador ainda não foi consumido.
 6. Seu conteúdo atende ao matcher do passo atual.
 
-Deve existir no máximo um trabalho ativo por combinação de conexão e número monitorado. Trabalhos adicionais permanecem em fila. Isso é necessário porque a conversa do WhatsApp não fornece um identificador de correção confiável para separar dois PNRs simultâneos.
+Deve existir no máximo um trabalho ativo por combinação de conexão e número monitorado. Cada webhook válido novo cancela atomicamente todo trabalho anterior não terminal antes de criar o novo. Isso evita que um timeout ou teste antigo bloqueie a solicitação mais recente, já que a conversa do WhatsApp não fornece um identificador confiável para separar dois PNRs simultâneos.
 
 Como há uma única conexão local, o ledger persistente usa `{targetNumber, messageId}` como chave global, atravessando trabalhos e reinícios. Cada trabalho mantém também sua lista curta de IDs consumidos. O webhook gera um identificador aleatório quando o cliente não fornece a chave opcional de idempotência. Eventos de sincronização de histórico não liberam etapas; o transporte registra o timestamp remoto quando disponível e carimba todas as mensagens de um mesmo lote com o mesmo instante local, impedindo que duas mensagens do lote avancem dois passos.
 
