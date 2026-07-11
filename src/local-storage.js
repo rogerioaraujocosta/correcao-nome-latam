@@ -28,6 +28,45 @@ async function currentWindowsSid() {
   return sid
 }
 
+function isPermissionError(error) {
+  return error?.code === 'EACCES' || error?.code === 'EPERM'
+}
+
+function assertRegularSingleLink(stats, markerPath) {
+  if (!stats.isFile() || stats.isSymbolicLink() || stats.nlink !== 1n) {
+    throw new Error(`O marcador do diretório privado deve ser um arquivo regular sem links: ${markerPath}`)
+  }
+}
+
+async function inspectSentinel(appPaths) {
+  const markerPath = assertPathInside(appPaths.localDirectory, appPaths.sentinel)
+  const stats = await fs.lstat(markerPath, { bigint: true })
+  assertRegularSingleLink(stats, markerPath)
+  return { markerPath, stats }
+}
+
+async function readRegularSentinel(appPaths) {
+  const { markerPath } = await inspectSentinel(appPaths)
+  return fs.readFile(markerPath, 'utf8')
+}
+
+async function readSentinel(appPaths) {
+  const { markerPath, stats: before } = await inspectSentinel(appPaths)
+
+  try {
+    return await fs.readFile(markerPath, 'utf8')
+  } catch (error) {
+    if (process.platform !== 'win32' || !isPermissionError(error)) throw error
+  }
+
+  await executeFile('icacls.exe', [markerPath, '/reset', '/L', '/Q'], { windowsHide: true })
+  const { stats: after } = await inspectSentinel(appPaths)
+  if (before.dev !== after.dev || before.ino !== after.ino) {
+    throw new Error(`O marcador do diretório privado foi alterado durante o reparo: ${markerPath}`)
+  }
+  return fs.readFile(markerPath, 'utf8')
+}
+
 export async function restrictWindowsAcl(directory) {
   if (process.platform !== 'win32') return
   const sid = await currentWindowsSid()
@@ -47,7 +86,6 @@ export async function restrictWindowsAcl(directory) {
     '*S-1-5-18:F',
     '*S-1-5-32-544:F',
     '/T',
-    '/C',
     '/Q',
   ], { windowsHide: true })
 }
@@ -57,7 +95,7 @@ export async function initializeLocalStorage(appPaths) {
   await assertRealDirectory(appPaths.localDirectory)
 
   if (await pathExists(appPaths.sentinel)) {
-    const value = await fs.readFile(appPaths.sentinel, 'utf8')
+    const value = await readSentinel(appPaths)
     if (value !== SENTINEL_CONTENT) {
       throw new Error(`O marcador do diretório privado é inválido: ${appPaths.sentinel}`)
     }
@@ -79,7 +117,7 @@ export async function initializeLocalStorage(appPaths) {
 export async function assertManagedLocalStorage(appPaths) {
   const root = assertPathInside(appPaths.localDirectory, appPaths.localDirectory)
   await assertRealDirectory(root)
-  const marker = await fs.readFile(appPaths.sentinel, 'utf8').catch(() => '')
+  const marker = await readRegularSentinel(appPaths).catch(() => '')
   if (marker !== SENTINEL_CONTENT) {
     throw new Error(`Exclusão recusada: marcador de segurança ausente em ${appPaths.localDirectory}`)
   }

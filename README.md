@@ -631,6 +631,19 @@ O bootstrap exige o lockfile. Baixe novamente a release/ZIP completa ou restaure
 
 Feche o terminal, abra outro na pasta do projeto e execute novamente `scripts/install.ps1` ou `scripts/install.sh`. No Windows, confira também `C:\Program Files\nodejs` no `PATH`.
 
+### Erro `EPERM` no arquivo `.latam-name-bot-data`
+
+A versão atual tenta recuperar automaticamente a permissão desse marcador no Windows sem apagar configurações, trabalhos ou autenticação. Se a instalação local for de uma versão anterior, repare somente o marcador no PowerShell e confira seu conteúdo:
+
+```powershell
+$marcador = Join-Path $env:LOCALAPPDATA 'latam-name-correction-bot\.latam-name-bot-data'
+icacls.exe $marcador /reset /L /Q
+if ($LASTEXITCODE -ne 0) { throw 'Não foi possível reparar o marcador.' }
+Get-Content -Raw -LiteralPath $marcador
+```
+
+O resultado deve ser exatamente `latam-name-correction-bot-data-v1`. Não exclua a pasta de dados para contornar esse erro. Depois, abra `%USERPROFILE%\correcao-nome-latam` e execute `npm run setup` novamente.
+
 ### PowerShell bloqueou o script
 
 Use o comando documentado com `-ExecutionPolicy Bypass`, que vale apenas para aquela execução. Não defina `Unrestricted` globalmente.
