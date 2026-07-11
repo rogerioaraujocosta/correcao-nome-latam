@@ -11,6 +11,7 @@ import { WorkflowEngine } from '../src/workflow-engine.js'
 
 const TARGET_NUMBER = '5511999999999'
 const QUIET_LOGGER = { info() {}, warn() {}, error() {} }
+const WELCOME_MESSAGE = 'Olá! Bem-vindo à LATAM Airlines. Como posso ajudá-lo hoje?'
 const IDENTITY_REQUEST = 'Perfeito! Vou ajudá-lo a corrigir o nome na sua reserva. Para validar sua identidade, preciso de um dos seguintes dados:'
 
 class MockWhatsApp {
@@ -67,7 +68,7 @@ async function createHarness(t, mutateWorkflow) {
   return { appPaths, config, store, whatsapp, engine, job }
 }
 
-function inbound(id, fromNumber = TARGET_NUMBER, text = IDENTITY_REQUEST) {
+function inbound(id, fromNumber = TARGET_NUMBER, text = 'Resposta da LATAM') {
   return { id, fromNumber, text, eligible: true }
 }
 
@@ -87,8 +88,9 @@ test('executa o fluxo completo em ordem e conclui somente após a resposta final
 
   assert.deepEqual(whatsapp.texts, ['Olá'])
 
-  for (let index = 1; index <= 5; index += 1) {
-    const result = await engine.handleInbound(inbound(`in-${index}`))
+  const replies = [WELCOME_MESSAGE, IDENTITY_REQUEST, 'nome atual?', 'nome correto?', 'confirmar?']
+  for (const [index, text] of replies.entries()) {
+    const result = await engine.handleInbound(inbound(`in-${index + 1}`, TARGET_NUMBER, text))
     assert.equal(result.accepted, true)
     assert.equal(result.completed, false)
   }
@@ -123,9 +125,13 @@ test('ignora remetente errado e não consome o próximo passo', async (t) => {
   assert.equal((await store.getJob('job-flow')).cursor, 1)
 })
 
-test('ignora aviso de processamento e só envia o motivo após a solicitação de identidade', async (t) => {
+test('responde à saudação, ignora processamento e só envia PNR após solicitação de identidade', async (t) => {
   const { store, whatsapp, engine } = await createHarness(t)
   await engine.setConnected(true)
+
+  const welcome = await engine.handleInbound(inbound('welcome', TARGET_NUMBER, WELCOME_MESSAGE))
+  assert.equal(welcome.accepted, true)
+  assert.deepEqual(whatsapp.texts, ['Olá', 'Preciso corrigir uma letra de um nome na reserva'])
 
   const ignored = await engine.handleInbound({
     id: 'processing-notice',
@@ -136,10 +142,10 @@ test('ignora aviso de processamento e só envia o motivo após a solicitação d
     accepted: false,
     reason: 'processing_notice',
     jobId: 'job-flow',
-    stepId: 'reason',
+    stepId: 'pnr',
   })
-  assert.deepEqual(whatsapp.texts, ['Olá'])
-  assert.equal((await store.getJob('job-flow')).cursor, 1)
+  assert.deepEqual(whatsapp.texts, ['Olá', 'Preciso corrigir uma letra de um nome na reserva'])
+  assert.equal((await store.getJob('job-flow')).cursor, 2)
 
   const accepted = await engine.handleInbound({
     id: 'identity-request',
@@ -151,14 +157,14 @@ test('ignora aviso de processamento e só envia o motivo após a solicitação d
 - Número do pedido ou código de reserva (PNR)`,
   })
   assert.equal(accepted.accepted, true)
-  assert.deepEqual(whatsapp.texts, ['Olá', 'Preciso corrigir uma letra de um nome na reserva'])
+  assert.deepEqual(whatsapp.texts, ['Olá', 'Preciso corrigir uma letra de um nome na reserva', 'QWEBZI'])
 })
 
 test('responde Sim e finaliza ao detectar encaminhamento por passageiro bebê com dados variáveis', async (t) => {
   const { store, whatsapp, engine } = await createHarness(t)
   await engine.setConnected(true)
-  await engine.handleInbound(inbound('identity'))
-  await engine.handleInbound(inbound('after-reason', TARGET_NUMBER, 'Informe seu código de reserva'))
+  await engine.handleInbound(inbound('welcome', TARGET_NUMBER, WELCOME_MESSAGE))
+  await engine.handleInbound(inbound('identity', TARGET_NUMBER, IDENTITY_REQUEST))
 
   const result = await engine.handleInbound(inbound('infant-handoff', TARGET_NUMBER, `Perfeito! Validei sua reserva ZX9K2P.
 
@@ -194,8 +200,8 @@ test('deduplica uma mensagem recebida mesmo após avançar de passo', async (t) 
   const { store, whatsapp, engine } = await createHarness(t)
   await engine.setConnected(true)
 
-  assert.equal((await engine.handleInbound(inbound('same-id'))).accepted, true)
-  const duplicate = await engine.handleInbound(inbound('same-id'))
+  assert.equal((await engine.handleInbound(inbound('same-id', TARGET_NUMBER, WELCOME_MESSAGE))).accepted, true)
+  const duplicate = await engine.handleInbound(inbound('same-id', TARGET_NUMBER, WELCOME_MESSAGE))
 
   assert.deepEqual(duplicate, { accepted: false, reason: 'duplicate' })
   assert.deepEqual(whatsapp.texts, [
@@ -209,8 +215,9 @@ test('deduplica globalmente uma mensagem reapresentada em um trabalho posterior'
   const { appPaths, config, store, whatsapp, engine } = await createHarness(t)
   await engine.setConnected(true)
 
-  for (let index = 1; index <= 6; index += 1) {
-    await engine.handleInbound(inbound(`global-${index}`))
+  const replies = [WELCOME_MESSAGE, IDENTITY_REQUEST, 'nome atual?', 'nome correto?', 'confirmar?', 'concluído']
+  for (const [index, text] of replies.entries()) {
+    await engine.handleInbound(inbound(`global-${index + 1}`, TARGET_NUMBER, text))
   }
   assert.equal((await store.getJob('job-flow')).status, 'completed')
 

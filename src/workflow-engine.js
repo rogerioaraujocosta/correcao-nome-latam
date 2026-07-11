@@ -125,7 +125,7 @@ export class WorkflowEngine {
         return { accepted: true, completed: true, jobId: job.id, ruleId: inboundRule.id }
       }
       if (!step || step.await?.mode === 'job_created' || !messageMatches(step.await, message)) {
-        if (step?.id === 'reason' && normalizeMatchText(message.text).includes(PROCESSING_NOTICE)) {
+        if (normalizeMatchText(message.text).includes(PROCESSING_NOTICE)) {
           return { accepted: false, reason: 'processing_notice', jobId: job.id, stepId: step.id }
         }
         return { accepted: false, reason: 'matcher' }

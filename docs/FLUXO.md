@@ -30,8 +30,8 @@ As expressões `{{pnr}}`, `{{currentName}}` e `{{correctName}}` são substituíd
 | Passo | Evento aguardado | Ação |
 | --- | --- | --- |
 | `hello` | Criação do trabalho (`job_created`) | Envia `Olá` |
-| `reason` | A mensagem da LATAM que contém “Para validar sua identidade” | Envia `Preciso corrigir uma letra de um nome na reserva` |
-| `pnr` | Próxima resposta nova | Envia `{{pnr}}` |
+| `reason` | A saudação da LATAM que contém “Como posso ajudá-lo hoje” | Envia `Preciso corrigir uma letra de um nome na reserva` |
+| `pnr` | A mensagem da LATAM que contém “Para validar sua identidade” | Envia `{{pnr}}` |
 | `current_name` | Próxima resposta nova | Envia `{{currentName}}` |
 | `correct_name` | Próxima resposta nova | Envia `{{correctName}}` |
 | `confirmation` | Próxima resposta nova | Envia `SIM` |
