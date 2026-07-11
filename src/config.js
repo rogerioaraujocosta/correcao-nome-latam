@@ -122,6 +122,36 @@ export function validateConfig(config, options = {}) {
       problems.push('workflow.jobTimeoutMinutes deve ser um inteiro entre 1 e 10080.')
     }
 
+    const inboundRules = config.workflow.inboundRules ?? []
+    if (!Array.isArray(inboundRules)) {
+      problems.push('workflow.inboundRules deve ser uma lista.')
+    } else {
+      const ruleIds = new Set()
+      inboundRules.forEach((rule, index) => {
+        const location = `workflow.inboundRules[${index}]`
+        if (!isPlainObject(rule)) {
+          problems.push(`${location} deve ser um objeto.`)
+          return
+        }
+        if (typeof rule.id !== 'string' || !/^[a-z][a-z0-9_-]{1,49}$/.test(rule.id)) {
+          problems.push(`${location}.id deve usar letras minúsculas, números, _ ou -.`)
+        } else if (ruleIds.has(rule.id)) {
+          problems.push(`${location}.id está duplicado: ${rule.id}.`)
+        } else {
+          ruleIds.add(rule.id)
+        }
+        if (!Array.isArray(rule.match?.allOf) || rule.match.allOf.length === 0 || rule.match.allOf.some((item) => typeof item !== 'string' || item.trim() === '')) {
+          problems.push(`${location}.match.allOf deve conter textos não vazios.`)
+        }
+        if (rule.send?.kind !== 'text' || typeof rule.send?.value !== 'string' || rule.send.value.trim() === '' || rule.send.value.length > 4096) {
+          problems.push(`${location}.send deve definir um texto não vazio.`)
+        } else {
+          validateTemplate(rule.send.value, `${location}.send.value`, problems)
+        }
+        if (rule.terminal !== 'success') problems.push(`${location}.terminal deve ser success.`)
+      })
+    }
+
     const steps = config.workflow.steps
     if (!Array.isArray(steps) || steps.length < 2) {
       problems.push('workflow.steps deve conter pelo menos dois passos.')

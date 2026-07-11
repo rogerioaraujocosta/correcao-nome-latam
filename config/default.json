@@ -20,6 +20,22 @@
   "workflow": {
     "stepTimeoutMinutes": 5,
     "jobTimeoutMinutes": 30,
+    "inboundRules": [
+      {
+        "id": "infant_agent_handoff",
+        "match": {
+          "allOf": [
+            "Esta reserva inclui um passageiro menor de 2 anos (bebê).",
+            "Gostaria que eu conecte você com um agente especializado"
+          ]
+        },
+        "send": {
+          "kind": "text",
+          "value": "Sim"
+        },
+        "terminal": "success"
+      }
+    ],
     "steps": [
       {
         "id": "hello",

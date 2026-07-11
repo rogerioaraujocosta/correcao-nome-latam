@@ -24,6 +24,12 @@ function messageMatches(awaitRule, message) {
   return false
 }
 
+function inboundRuleMatches(rule, message) {
+  if (!message || message.eligible === false) return false
+  const text = normalizeMatchText(String(message.text ?? '').slice(0, 4096))
+  return Boolean(text) && rule.match.allOf.every((candidate) => text.includes(normalizeMatchText(candidate)))
+}
+
 export class WorkflowEngine {
   constructor({ store, whatsapp, config, logger = console }) {
     this.store = store
@@ -102,7 +108,21 @@ export class WorkflowEngine {
         return { accepted: false, reason: 'old_message' }
       }
 
+      const inboundRule = (job.workflow.inboundRules ?? []).find((rule) => inboundRuleMatches(rule, message))
       const step = job.workflow.steps[job.cursor]
+      if (inboundRule) {
+        this.#clearTimeout()
+        const consumed = await this.store.consumeInbound(job.id, {
+          messageId: message.id,
+          targetNumber: message.fromNumber,
+          observedAt: message.observedAt ?? isoNow(),
+          sourceTimestamp: message.sourceTimestamp,
+          stepId: `rule:${inboundRule.id}`,
+        })
+        if (!consumed) return { accepted: false, reason: 'duplicate' }
+        await this.#sendTerminalRule(job.id, inboundRule)
+        return { accepted: true, completed: true, jobId: job.id, ruleId: inboundRule.id }
+      }
       if (!step || step.await?.mode === 'job_created' || !messageMatches(step.await, message)) {
         return { accepted: false, reason: 'matcher' }
       }
@@ -192,6 +212,19 @@ export class WorkflowEngine {
       }
 
       if (job.status === 'send_uncertain' && (action === 'retry-send' || action === 'assume-sent')) {
+        const pendingRuleId = job.pendingStepId?.startsWith('rule:') ? job.pendingStepId.slice(5) : null
+        const pendingRule = pendingRuleId
+          ? (job.workflow.inboundRules ?? []).find((rule) => rule.id === pendingRuleId)
+          : null
+        if (pendingRule) {
+          if (action === 'retry-send') {
+            await this.#sendTerminalRule(job.id, pendingRule, { retry: true })
+          } else {
+            await this.#completeTerminalRule(job.id, pendingRule.id, 'uncertain_send_assumed_sent')
+          }
+          return this.store.getJob(job.id)
+        }
+
         const pendingIndex = job.workflow.steps.findIndex((step) => step.id === job.pendingStepId)
         if (pendingIndex < 0) throw new Error('O passo de envio incerto não existe mais no snapshot do trabalho.')
 
@@ -304,6 +337,53 @@ export class WorkflowEngine {
         job.history.push({ at: isoNow(), event: 'send_uncertain', stepId: step.id })
       })
       this.logger.error?.({ jobId, stepId: step.id, error: safeError }, 'Envio incerto; revisão necessária')
+      throw error
+    }
+  }
+
+  async #completeTerminalRule(jobId, ruleId, event = 'conditional_rule_completed', result) {
+    const completedAt = isoNow()
+    await this.store.updateJob(jobId, (job) => {
+      job.status = 'completed'
+      job.lastOutboundAt = completedAt
+      job.waitingSince = null
+      job.pendingStepId = null
+      job.error = null
+      if (result?.key?.id) job.outboundMessageIds.push(result.key.id)
+      job.history.push({ at: completedAt, event, ruleId, messageId: result?.key?.id ?? null })
+    })
+    this.logger.info?.({ jobId, ruleId }, 'Trabalho concluído por regra condicional')
+    await this.#kick()
+  }
+
+  async #sendTerminalRule(jobId, rule, options = {}) {
+    if (!this.connected) throw new Error('WhatsApp desconectado.')
+    const before = await this.store.getJob(jobId)
+    if (!before) throw new Error('Trabalho não encontrado antes do envio condicional.')
+    if (!this.#destinationMatches(before)) throw new Error('Envio condicional bloqueado por divergência de destinatário.')
+
+    const pendingStepId = `rule:${rule.id}`
+    const sendStartedAt = isoNow()
+    await this.store.updateJob(jobId, (job) => {
+      job.status = 'sending'
+      job.pendingStepId = pendingStepId
+      job.waitingSince = sendStartedAt
+      job.error = null
+      job.history.push({ at: sendStartedAt, event: options.retry ? 'conditional_send_retry_started' : 'conditional_send_started', ruleId: rule.id })
+    })
+
+    try {
+      const text = renderTemplate(rule.send.value, before.payload)
+      const result = await this.whatsapp.sendText(text)
+      await this.#completeTerminalRule(jobId, rule.id, 'conditional_rule_completed', result)
+    } catch (error) {
+      const safeError = redactError(error)
+      await this.store.updateJob(jobId, (job) => {
+        job.status = 'send_uncertain'
+        job.error = safeError
+        job.history.push({ at: isoNow(), event: 'conditional_send_uncertain', ruleId: rule.id })
+      })
+      this.logger.error?.({ jobId, ruleId: rule.id, error: safeError }, 'Envio condicional incerto; revisão necessária')
       throw error
     }
   }

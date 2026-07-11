@@ -372,6 +372,16 @@ async function commandWorkflowShow() {
   const config = await loadConfig(paths)
   console.log(`Configuração ativa: ${paths.config}`)
   console.log(`Timeout por resposta: ${config.workflow.stepTimeoutMinutes} min | Timeout total: ${config.workflow.jobTimeoutMinutes} min`)
+  if (config.workflow.inboundRules?.length) {
+    console.log('\nRegras condicionais (avaliadas em qualquer etapa):')
+    console.table(config.workflow.inboundRules.map((rule) => ({
+      id: rule.id,
+      detecta: rule.match.allOf.join(' + '),
+      responde: rule.send.value,
+      finaliza: rule.terminal === 'success' ? 'sim' : 'não',
+    })))
+  }
+  console.log('\nSequência principal:')
   console.table(config.workflow.steps.map((step, index) => ({
     ordem: index + 1,
     id: step.id,

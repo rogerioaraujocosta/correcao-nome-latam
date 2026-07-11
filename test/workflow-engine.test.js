@@ -151,6 +151,42 @@ test('ignora aviso de processamento e só envia o motivo após a solicitação d
   assert.deepEqual(whatsapp.texts, ['Olá', 'Preciso corrigir uma letra de um nome na reserva'])
 })
 
+test('responde Sim e finaliza ao detectar encaminhamento por passageiro bebê com dados variáveis', async (t) => {
+  const { store, whatsapp, engine } = await createHarness(t)
+  await engine.setConnected(true)
+  await engine.handleInbound(inbound('identity'))
+  await engine.handleInbound(inbound('after-reason', TARGET_NUMBER, 'Informe seu código de reserva'))
+
+  const result = await engine.handleInbound(inbound('infant-handoff', TARGET_NUMBER, `Perfeito! Validei sua reserva ZX9K2P.
+
+Nome atual: Maria de Souza Silva
+Status: Solicitação em análise
+Motivo: Esta reserva inclui um passageiro menor de 2 anos (bebê). Para corrigir o nome em reservas com bebês, você precisará da ajuda de um agente.
+
+Gostaria que eu conecte você com um agente especializado para ajudá-lo com a alteração da reserva?`))
+
+  assert.deepEqual(result, {
+    accepted: true,
+    completed: true,
+    jobId: 'job-flow',
+    ruleId: 'infant_agent_handoff',
+  })
+  assert.deepEqual(whatsapp.texts, [
+    'Olá',
+    'Preciso corrigir uma letra de um nome na reserva',
+    'QWEBZI',
+    'Sim',
+  ])
+  const completed = await store.getJob('job-flow')
+  assert.equal(completed.status, 'completed')
+  assert.equal(completed.pendingStepId, null)
+  assert.equal(completed.history.at(-1).event, 'conditional_rule_completed')
+
+  const later = await engine.handleInbound(inbound('after-completion', TARGET_NUMBER, 'Qual é o nome correto?'))
+  assert.deepEqual(later, { accepted: false, reason: 'no_waiting_job' })
+  assert.equal(whatsapp.texts.at(-1), 'Sim')
+})
+
 test('deduplica uma mensagem recebida mesmo após avançar de passo', async (t) => {
   const { store, whatsapp, engine } = await createHarness(t)
   await engine.setConnected(true)

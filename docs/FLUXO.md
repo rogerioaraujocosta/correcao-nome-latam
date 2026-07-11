@@ -39,6 +39,8 @@ As expressões `{{pnr}}`, `{{currentName}}` e `{{correctName}}` são substituíd
 | `ticket_pdf` | Próxima resposta nova | Envia o arquivo indicado por `ticketPdf` |
 | `final_confirmation` | Próxima resposta nova | Encerra o trabalho com sucesso |
 
+A regra global `infant_agent_handoff` é avaliada em qualquer passo. Se uma mensagem contiver simultaneamente “Esta reserva inclui um passageiro menor de 2 anos (bebê)” e “Gostaria que eu conecte você com um agente especializado”, o bot envia `Sim` e conclui imediatamente o trabalho. PNR, nome e demais campos da mensagem não participam da correspondência e podem variar.
+
 Cada mensagem recebida pode liberar no máximo um passo. Mesmo que um texto corresponda a mais de um matcher, o engine deve consumir o evento apenas no passo atual.
 
 ## Estados

@@ -369,6 +369,10 @@ Para uma alteração pessoal, edite o `config.json` privado, não `config/defaul
 
 Cada mensagem recebida libera no máximo um passo. O aviso “Obrigado por aguardar na linha. Estou processando sua solicitação...” é ignorado no passo `reason`; somente a mensagem da LATAM que oferece ajuda e solicita um dado de identidade libera o envio do motivo. Os passos seguintes ainda usam `any_inbound`. Se o menu da LATAM mudar, revise os matchers com `npm run workflow:edit`.
 
+### Regras condicionais globais
+
+As regras de `workflow.inboundRules` são avaliadas em qualquer etapa enquanto houver um trabalho aguardando. A regra `infant_agent_handoff` exige que a mesma mensagem contenha os dois trechos invariáveis sobre passageiro menor de 2 anos e conexão com agente especializado. Nome, PNR, status e textos intermediários podem variar. Quando a regra corresponde, o bot envia apenas `Sim`, conclui o trabalho e não executa mais nenhum passo desse trabalho.
+
 ### Estrutura de um passo
 
 Mensagem fixa:
