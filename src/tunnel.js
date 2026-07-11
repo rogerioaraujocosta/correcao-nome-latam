@@ -53,6 +53,29 @@ export async function assertLocalWebhookReady(url, fetchImplementation = fetch) 
   }
 }
 
+export async function notifyTunnelWebhook({ notifyUrl, publicUrl, fetchImplementation = fetch }) {
+  if (!notifyUrl) return { sent: false }
+  const body = {
+    event: 'tunnel_ready',
+    webhookUrl: publicWebhookUrl(publicUrl),
+    publicBaseUrl: String(publicUrl).replace(/\/+$/, ''),
+    generatedAt: new Date().toISOString(),
+  }
+  let response
+  try {
+    response = await fetchImplementation(notifyUrl, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(10_000),
+    })
+  } catch {
+    throw new Error(`Não foi possível avisar o webhook cadastrado: ${notifyUrl}`)
+  }
+  if (!response.ok) throw new Error(`O webhook cadastrado respondeu HTTP ${response.status}: ${notifyUrl}`)
+  return { sent: true, body }
+}
+
 export async function runTunnel(options = {}) {
   const config = options.config ?? await loadConfig(paths, { requireNumber: true })
   const token = options.token ?? await readWebhookToken(paths)
@@ -67,6 +90,15 @@ export async function runTunnel(options = {}) {
   if (!tunnel) throw new Error('A criação do túnel foi cancelada.')
 
   const publicUrl = await tunnel.getURL()
+  const notifyUrl = config.tunnel?.notifyWebhookUrl
+  if (notifyUrl) {
+    try {
+      await notifyTunnelWebhook({ notifyUrl, publicUrl, fetchImplementation: options.fetchImplementation })
+      console.log(`URL atual do túnel enviada para: ${notifyUrl}`)
+    } catch (error) {
+      console.warn(`Aviso: ${error.message}`)
+    }
+  }
   console.log(startupSummary({ publicUrl, token, config }))
   return tunnel
 }

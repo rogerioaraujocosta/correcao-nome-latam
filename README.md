@@ -33,7 +33,7 @@ Na primeira vez:
 npm run setup
 ```
 
-Informe o número monitorado, confirme a inicialização e leia o QR Code em **WhatsApp > Dispositivos conectados > Conectar um dispositivo**.
+Informe o número monitorado. O assistente também pergunta se a URL atual do túnel deve ser enviada para outro webhook; se responder `sim`, informe uma URL HTTPS. Depois, confirme a inicialização e leia o QR Code em **WhatsApp > Dispositivos conectados > Conectar um dispositivo**.
 
 ### 4. Iniciar bot, webhook e túnel público
 
@@ -145,10 +145,10 @@ O terminal precisa permanecer aberto enquanto o bot estiver funcionando. Para en
 
 - Lê o QR Code no próprio terminal e mantém a autenticação somente na máquina do usuário.
 - Expõe um webhook HTTP local autenticado para receber PNR, nome atual e nome correto.
-- Envia `Olá` quando um trabalho entra na fila e o WhatsApp está conectado.
+- Envia `Olá` quando um trabalho novo é recebido e o WhatsApp está conectado.
 - Aguarda uma resposta nova do número monitorado antes de enviar cada mensagem seguinte.
 - Ignora mensagens de outros números, grupos e histórico sincronizado; uma mensagem manual enviada pela própria conta pausa o trabalho para revisão.
-- Mantém fila, idempotência, timeouts e estados de recuperação para evitar reenvios cegos.
+- Mantém persistência, idempotência opcional, timeouts e estados de recuperação para evitar reenvios cegos.
 - Permite alterar o número monitorado, reconectar, forçar novo QR e excluir a conexão.
 - Mantém credenciais, token, configuração pessoal e trabalhos na área privada do usuário, fora do repositório Git.
 
@@ -157,7 +157,7 @@ O QR Code **não gera um webhook**. São duas partes diferentes:
 ```mermaid
 flowchart LR
     A["Sistema ou operador"] -->|"POST local + Bearer token"| B["Webhook HTTP"]
-    B --> C["Fila e workflow local"]
+    B --> C["Trabalho ativo e workflow local"]
     C -->|"mensagens"| D["Baileys"]
     D --> E["Conversa com o número monitorado"]
     E -->|"respostas novas"| D
@@ -440,6 +440,19 @@ Não altere `server.host` para `0.0.0.0`: o túnel acessa o servidor local diret
 
 O túnel é temporário, não possui garantia de disponibilidade e recebe uma URL diferente a cada inicialização. Para uma URL fixa em produção, configure um Cloudflare Tunnel nomeado em uma conta própria. O projeto não automatiza credenciais ou DNS de terceiros.
 
+Se `tunnel.notifyWebhookUrl` foi configurado pelo assistente, cada inicialização envia um `POST` sem autenticação para essa URL:
+
+```json
+{
+  "event": "tunnel_ready",
+  "webhookUrl": "https://exemplo.trycloudflare.com/webhooks/name-correction",
+  "publicBaseUrl": "https://exemplo.trycloudflare.com",
+  "generatedAt": "2026-07-11T22:34:43.853Z"
+}
+```
+
+Uma falha nesse aviso é mostrada no terminal, mas não derruba o bot. Para alterar ou remover o destino, pare o bot e execute `npm run setup` novamente.
+
 Obtenha o token com:
 
 ```bash
@@ -464,6 +477,8 @@ Authorization: Bearer SEU_TOKEN
 | `POST /api/jobs/:id/actions` | Bearer | Recupera, cancela ou resolve envio incerto |
 
 Um trabalho novo normalmente retorna HTTP `202`. Repetir a mesma chave de idempotência retorna HTTP `200`, `created: false` e o trabalho já existente.
+
+Cada POST válido novo cancela automaticamente todos os trabalhos anteriores ainda não terminais. A resposta informa essa quantidade em `cancelledPreviousJobs`. Assim, a solicitação mais recente sempre substitui a anterior e pode iniciar sem bloqueio legado.
 
 ### Campos de criação
 
@@ -510,7 +525,7 @@ $request = @{
 Invoke-RestMethod @request
 ```
 
-### Consultar fila e saúde
+### Consultar trabalhos e saúde
 
 ```bash
 TOKEN="$(npm run --silent token:show)"
@@ -522,11 +537,11 @@ curl --header "Authorization: Bearer ${TOKEN}" \
 
 ## Estados e recuperação
 
-O bot processa somente um trabalho ativo por conversa. Os seguintes permanecem em `queued` até o anterior ser concluído, cancelado ou resolvido.
+O bot processa somente um trabalho ativo por conversa. Um POST válido novo cancela automaticamente o trabalho anterior; `queued` é usado apenas enquanto o WhatsApp está desconectado ou durante a breve transição de início.
 
 | Estado | Significado | Ação típica |
 | --- | --- | --- |
-| `queued` | Aguardando conexão ou sua vez na fila | Aguarde; não duplique a requisição |
+| `queued` | Aguardando a conexão do WhatsApp ou o início do envio | Confira `/health`; um POST posterior substituirá este trabalho |
 | `sending` | Envio em andamento | Não interrompa o processo intencionalmente |
 | `waiting` | Aguardando resposta do número monitorado | Confira a conversa e o matcher atual |
 | `timed_out` | Passo ou trabalho excedeu o tempo | Revise e use `resume-waiting` ou `cancel` |

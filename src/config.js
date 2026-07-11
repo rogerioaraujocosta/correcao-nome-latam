@@ -66,6 +66,24 @@ export function validateConfig(config, options = {}) {
     }
   }
 
+  if (!isPlainObject(config.tunnel)) {
+    problems.push('tunnel deve ser um objeto.')
+  } else {
+    const notifyWebhookUrl = config.tunnel.notifyWebhookUrl
+    if (typeof notifyWebhookUrl !== 'string' || notifyWebhookUrl.length > 2048) {
+      problems.push('tunnel.notifyWebhookUrl deve ser um texto de até 2048 caracteres.')
+    } else if (notifyWebhookUrl) {
+      try {
+        const parsed = new URL(notifyWebhookUrl)
+        if (parsed.protocol !== 'https:' || parsed.username || parsed.password) {
+          problems.push('tunnel.notifyWebhookUrl deve ser uma URL HTTPS sem usuário ou senha.')
+        }
+      } catch {
+        problems.push('tunnel.notifyWebhookUrl deve ser uma URL HTTPS válida.')
+      }
+    }
+  }
+
   if (!isPlainObject(config.whatsapp)) {
     problems.push('whatsapp deve ser um objeto.')
   } else {

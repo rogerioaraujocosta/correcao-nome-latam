@@ -25,6 +25,7 @@ test('a configuração padrão descreve exatamente o fluxo atual', async () => {
   const config = await loadDefaultConfig(createPaths())
 
   assert.equal(config.schemaVersion, 1)
+  assert.equal(config.tunnel.notifyWebhookUrl, '')
   assert.equal(config.whatsapp.monitoredNumber, '')
   assert.deepEqual(
     config.workflow.steps.map((step) => step.id),
@@ -51,6 +52,15 @@ test('a configuração padrão descreve exatamente o fluxo atual', async () => {
   )
   assert.equal(config.workflow.steps[5].send.value, 'SIM')
   assert.equal(config.workflow.steps.at(-1).terminal, 'success')
+})
+
+test('valida o webhook HTTPS opcional que recebe a URL do túnel', async () => {
+  const config = structuredClone(await loadDefaultConfig(createPaths()))
+  config.tunnel.notifyWebhookUrl = 'https://automacao.example/webhooks/tunnel'
+  assert.doesNotThrow(() => validateConfig(config))
+
+  config.tunnel.notifyWebhookUrl = 'http://automacao.example/inseguro'
+  assert.throws(() => validateConfig(config), /URL HTTPS/)
 })
 
 test('o número é obrigatório ao iniciar e templates desconhecidos são recusados', async () => {

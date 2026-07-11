@@ -81,6 +81,23 @@ async function configuredNumber(config) {
   }
 }
 
+async function configuredTunnelNotification(config) {
+  const current = config.tunnel?.notifyWebhookUrl ?? ''
+  if (current && await confirm(`Manter o webhook que recebe a URL do túnel (${current})?`, true)) return current
+  if (!(await confirm('Deseja enviar automaticamente a URL atual do túnel para outro webhook?', false))) return ''
+
+  while (true) {
+    const value = await ask('URL HTTPS do webhook que receberá a URL do túnel: ')
+    try {
+      const parsed = new URL(value)
+      if (parsed.protocol !== 'https:' || parsed.username || parsed.password) throw new Error()
+      if (await confirm(`Confirmar o webhook ${parsed.href}?`, false)) return parsed.href
+    } catch {
+      console.log('Informe uma URL HTTPS válida, sem usuário ou senha.')
+    }
+  }
+}
+
 async function commandSetup() {
   console.log('\nAssistente do Bot de Correção de Nome via WhatsApp')
   console.log('Este projeto usa uma integração não oficial. Use apenas em uma conta autorizada, sem spam.')
@@ -115,6 +132,8 @@ async function commandSetup() {
     }
   }
   config.whatsapp.monitoredNumber = nextNumber
+  config.tunnel ??= { notifyWebhookUrl: '' }
+  config.tunnel.notifyWebhookUrl = await configuredTunnelNotification(config)
   await saveConfig(paths, config)
   const token = await ensureWebhookToken(paths)
 

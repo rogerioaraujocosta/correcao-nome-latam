@@ -117,9 +117,28 @@ test('cria trabalhos distintos quando Idempotency-Key e requestId não são envi
 
   assert.equal(first.body.created, true)
   assert.equal(second.body.created, true)
+  assert.equal(second.body.cancelledPreviousJobs, 1)
   assert.notEqual(first.body.job.requestId, second.body.job.requestId)
   assert.equal(first.body.job.requestId.length, 36)
-  assert.equal((await store.listJobs()).length, 2)
+  const jobs = await store.listJobs()
+  assert.equal(jobs.length, 2)
+  assert.equal(jobs.find((job) => job.id === first.body.job.id).status, 'cancelled')
+  assert.equal(jobs.find((job) => job.id === second.body.job.id).status, 'waiting')
+})
+
+test('um webhook novo cancela automaticamente o trabalho antigo bloqueante', async (t) => {
+  const { store, app } = await createHarness(t)
+  const first = await validJobRequest(app, 'blocking-request-0001').expect(202)
+  await store.updateJob(first.body.job.id, (job) => {
+    job.status = 'timed_out'
+    job.error = 'revisão necessária'
+  })
+
+  const second = await validJobRequest(app, 'queued-request-0002').expect(202)
+  assert.equal(second.body.created, true)
+  assert.equal(second.body.cancelledPreviousJobs, 1)
+  assert.equal(second.body.job.status, 'waiting')
+  assert.equal((await store.getJob(first.body.job.id)).status, 'cancelled')
 })
 
 test('aceita somente os dados sem PDF e recusa um arquivo inválido quando enviado', async (t) => {

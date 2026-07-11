@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { assertLocalWebhookReady, localServerUrl, publicWebhookUrl, startupSummary } from '../src/tunnel.js'
+import { assertLocalWebhookReady, localServerUrl, notifyTunnelWebhook, publicWebhookUrl, startupSummary } from '../src/tunnel.js'
 
 test('monta as URLs local e pública do webhook sem duplicar barras', () => {
   assert.equal(localServerUrl({ server: { host: '127.0.0.1', port: 3000 } }), 'http://127.0.0.1:3000')
@@ -42,4 +42,25 @@ test('mostra endpoint, token, número monitorado e payload sem PDF no terminal',
   assert.match(summary, new RegExp(`Authorization: Bearer ${token}`))
   assert.match(summary, /"pnr": "QWEBZI"/)
   assert.doesNotMatch(summary, /ticketPdf|ticketFileName|Idempotency-Key: /i)
+})
+
+test('envia a URL pública atual ao webhook configurado', async () => {
+  let request
+  const result = await notifyTunnelWebhook({
+    notifyUrl: 'https://automacao.example/tunnel-ready',
+    publicUrl: 'https://atual.trycloudflare.com',
+    fetchImplementation: async (url, options) => {
+      request = { url, options }
+      return { ok: true, status: 200 }
+    },
+  })
+
+  assert.equal(result.sent, true)
+  assert.equal(request.url, 'https://automacao.example/tunnel-ready')
+  assert.equal(request.options.method, 'POST')
+  const body = JSON.parse(request.options.body)
+  assert.equal(body.event, 'tunnel_ready')
+  assert.equal(body.webhookUrl, 'https://atual.trycloudflare.com/webhooks/name-correction')
+  assert.equal(body.publicBaseUrl, 'https://atual.trycloudflare.com')
+  assert.match(body.generatedAt, /^\d{4}-\d{2}-\d{2}T/)
 })

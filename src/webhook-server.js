@@ -126,6 +126,7 @@ export function createWebhookApp({ config, token, store, engine, logger = consol
         attachmentPath,
         workflow: config.workflow,
         targetNumber: config.whatsapp.monitoredNumber,
+        supersedeUnfinished: true,
       })
 
       if (!result.created && attachmentPath) {
@@ -141,7 +142,19 @@ export function createWebhookApp({ config, token, store, engine, logger = consol
       }
 
       const current = await store.getJob(result.job.id)
-      return response.status(result.created ? 202 : 200).json({ created: result.created, job: publicJob(current) })
+      const responseBody = {
+        created: result.created,
+        cancelledPreviousJobs: result.cancelledPreviousJobs ?? 0,
+        job: publicJob(current),
+      }
+      if (current.status === 'queued') {
+        const blocking = await store.getBlockingJob()
+        if (blocking && blocking.id !== current.id) {
+          responseBody.warning = 'O trabalho entrou na fila porque existe outro trabalho que precisa ser concluído, cancelado ou resolvido.'
+          responseBody.blockedBy = publicJob(blocking)
+        }
+      }
+      return response.status(result.created ? 202 : 200).json(responseBody)
     } catch (error) {
       if (attachmentPath) await fs.rm(attachmentPath, { force: true }).catch(() => {})
       return next(error)

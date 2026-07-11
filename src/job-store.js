@@ -124,12 +124,25 @@ export class JobStore {
     })
   }
 
-  async createJob({ id, requestId, payload, attachmentPath, workflow, targetNumber }) {
+  async createJob({ id, requestId, payload, attachmentPath, workflow, targetNumber, supersedeUnfinished = false }) {
     return this.transact((state) => {
       const existing = state.jobs.find((job) => job.requestId === requestId)
       if (existing) return { job: existing, created: false }
 
       const timestamp = nowIso()
+      let cancelledPreviousJobs = 0
+      if (supersedeUnfinished) {
+        for (const previous of state.jobs) {
+          if (TERMINAL_STATUSES.has(previous.status)) continue
+          previous.status = 'cancelled'
+          previous.waitingSince = null
+          previous.pendingStepId = null
+          previous.error = null
+          previous.updatedAt = timestamp
+          previous.history.push({ at: timestamp, event: 'superseded_by_new_webhook' })
+          cancelledPreviousJobs += 1
+        }
+      }
       const job = {
         id: id ?? crypto.randomUUID(),
         requestId,
@@ -151,7 +164,7 @@ export class JobStore {
         error: null,
       }
       state.jobs.push(job)
-      return { job, created: true }
+      return { job, created: true, cancelledPreviousJobs }
     })
   }
 
