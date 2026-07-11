@@ -5,6 +5,7 @@ import { createLogger } from './logger.js'
 import { acquirePidLock } from './pid-lock.js'
 import { paths as defaultPaths } from './paths.js'
 import { ensureWebhookToken } from './token.js'
+import { runTunnel } from './tunnel.js'
 import { ensurePrivateDirectory, redactError } from './utils.js'
 import { createWebhookApp, listenWebhook } from './webhook-server.js'
 import { WhatsAppClient } from './whatsapp-client.js'
@@ -21,13 +22,19 @@ function closeServer(server) {
   })
 }
 
-export async function startBot({ appPaths = defaultPaths, logger = createLogger() } = {}) {
+export async function startBot({
+  appPaths = defaultPaths,
+  logger = createLogger(),
+  tunnelFactory = runTunnel,
+  whatsappFactory = (options) => new WhatsAppClient(options),
+} = {}) {
   await initializeLocalStorage(appPaths)
   const releasePid = await acquirePidLock(appPaths)
   let server
   let whatsapp
   let engine
   let cleanupInterval
+  let publicTunnel
   let stopped = false
   let resolveDone
   const done = new Promise((resolve) => {
@@ -47,7 +54,7 @@ export async function startBot({ appPaths = defaultPaths, logger = createLogger(
     cleanupInterval.unref?.()
     await ensurePrivateDirectory(appPaths.auth)
 
-    whatsapp = new WhatsAppClient({
+    whatsapp = whatsappFactory({
       authDirectory: appPaths.auth,
       targetNumber: config.whatsapp.monitoredNumber,
       reconnect: config.whatsapp.reconnect,
@@ -90,6 +97,8 @@ export async function startBot({ appPaths = defaultPaths, logger = createLogger(
       logger.warn('O servidor não está limitado ao computador local. Use firewall, TLS e rotação do token.')
     }
 
+    publicTunnel = await tunnelFactory({ config })
+
     await whatsapp.start()
 
     const stop = async (reason = 'requested') => {
@@ -98,6 +107,7 @@ export async function startBot({ appPaths = defaultPaths, logger = createLogger(
       logger.info({ reason }, 'Encerrando o bot')
       if (cleanupInterval) clearInterval(cleanupInterval)
       await engine.stop().catch(() => {})
+      await publicTunnel?.close().catch(() => {})
       await closeServer(server)
       await whatsapp.stop().catch(() => {})
       await releasePid().catch(() => {})
@@ -105,9 +115,10 @@ export async function startBot({ appPaths = defaultPaths, logger = createLogger(
       return done
     }
 
-    return { config, token, store, engine, whatsapp, server, stop, done }
+    return { config, token, store, engine, whatsapp, server, publicTunnel, stop, done }
   } catch (error) {
     if (cleanupInterval) clearInterval(cleanupInterval)
+    await publicTunnel?.close().catch(() => {})
     await closeServer(server).catch(() => {})
     await whatsapp?.stop().catch(() => {})
     await releasePid().catch(() => {})

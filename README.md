@@ -35,35 +35,31 @@ npm run setup
 
 Informe o número monitorado, confirme a inicialização e leia o QR Code em **WhatsApp > Dispositivos conectados > Conectar um dispositivo**.
 
-### 4. Iniciar o bot e o webhook local
+### 4. Iniciar bot, webhook e túnel público
 
 ```powershell
 npm start
 ```
 
-Mantenha esse terminal aberto. O webhook local ficará em `http://127.0.0.1:3000/webhooks/name-correction`.
-
-### 5. Publicar o webhook para um sistema na nuvem
-
-Com `npm start` aberto, abra um **segundo PowerShell**:
-
-```powershell
-cd "$HOME\correcao-nome-latam"
-npm run tunnel
-```
-
-Na primeira execução, o utilitário pede autorização para baixar o `cloudflared` e aceitar os termos da Cloudflare. Ao final, ele mostra uma URL como:
+O mesmo comando inicia o servidor local e cria o túnel HTTPS. Na primeira execução, o utilitário pede autorização para baixar o `cloudflared` e aceitar os termos da Cloudflare. Ao final, o terminal mostra uma URL como:
 
 ```text
 https://nome-aleatorio.trycloudflare.com/webhooks/name-correction
 ```
 
-Cadastre essa URL no sistema em nuvem e mantenha os dois terminais abertos. A URL é temporária e muda quando o túnel é reiniciado. Todas as requisições continuam exigindo o header `Authorization: Bearer SEU_TOKEN`.
+Cadastre essa URL no sistema em nuvem e mantenha o terminal aberto. A URL é temporária e muda quando o servidor é reiniciado. Todas as requisições continuam exigindo o header `Authorization: Bearer SEU_TOKEN`.
 
-### 6. Mostrar o token do webhook
+### 5. Mostrar o token e conferir o fluxo
 
 ```powershell
 npm run token:show
+npm run workflow:show
+```
+
+Para editar a sequência, primeiro encerre o servidor com `Ctrl+C` e execute:
+
+```powershell
+npm run workflow:edit
 ```
 
 ### Resumo rápido
@@ -72,15 +68,16 @@ npm run token:show
 | --- | --- |
 | Instalar/atualizar | linha única do PowerShell acima |
 | Configurar pela primeira vez | `npm run setup` |
-| Iniciar bot e webhook | `npm start` |
-| Criar URL pública HTTPS | `npm run tunnel` em outro terminal |
+| Iniciar bot, webhook e URL pública HTTPS | `npm start` |
 | Mostrar token Bearer | `npm run token:show` |
+| Conferir sequência de mensagens | `npm run workflow:show` |
+| Editar sequência de mensagens | Pare o bot e use `npm run workflow:edit` |
 | Verificar saúde/configuração | `npm run doctor` |
 | Ver estado do bot | `npm run status` |
 | Alterar número monitorado | `npm run config:number` |
 | Reconectar WhatsApp | `npm run reconnect` |
 | Listar trabalhos | `npm run jobs` |
-| Encerrar bot ou túnel | `Ctrl+C` no respectivo terminal |
+| Encerrar bot e túnel | `Ctrl+C` |
 
 O instalador:
 
@@ -136,7 +133,8 @@ O terminal precisa permanecer aberto enquanto o bot estiver funcionando. Para en
 | --- | --- |
 | Primeira instalação no Windows | Use a linha única da seção **Primeira vez no Windows** |
 | Iniciar depois de instalado | Clique em `INICIAR-WINDOWS.cmd` ou use `npm start` dentro da pasta |
-| Publicar o webhook na internet | Em outro terminal, use `npm run tunnel` |
+| Mostrar o fluxo ativo | `npm run workflow:show` |
+| Editar o fluxo ativo | Pare o bot e use `npm run workflow:edit` |
 | Executar novamente a configuração inicial | `npm run setup` |
 | Alterar o número monitorado | `npm run config:number` |
 | Reconectar ou gerar outro QR | `npm run reconnect` |
@@ -250,7 +248,7 @@ O assistente:
 3. cria `config.json` no diretório privado do usuário a partir da configuração padrão;
 4. cria um token aleatório para o webhook nesse mesmo diretório privado;
 5. pergunta se deve iniciar o bot imediatamente;
-6. mostra o QR Code no terminal quando uma nova autenticação é necessária.
+6. cria o túnel público e mostra o QR Code quando uma nova autenticação é necessária.
 
 No celular, abra **WhatsApp > Dispositivos conectados > Conectar um dispositivo** e leia o QR. A sessão será gravada na área privada da conta do sistema operacional. Não envie esse diretório a ninguém.
 
@@ -264,12 +262,14 @@ Mantenha o terminal aberto. Use `Ctrl+C` para encerrar de forma controlada. Apen
 
 ## Comandos operacionais
 
-Execute os comandos com o bot parado, salvo quando a seção indicar o contrário.
+Os comandos de alteração exigem o bot parado. Consultas como `workflow:show`, `status`, `jobs` e `token:show` podem ser usadas com ele em execução.
 
 | Objetivo | Comando | Comportamento |
 | --- | --- | --- |
-| Iniciar | `npm start` | Abre webhook e WhatsApp; reutiliza a sessão local quando possível |
+| Iniciar | `npm start` | Abre webhook, túnel público e WhatsApp; reutiliza a sessão local quando possível |
 | Configuração inicial | `npm run setup` | Configura número, token e oferece QR |
+| Mostrar sequência | `npm run workflow:show` | Exibe em tabela todas as esperas, mensagens e o PDF |
+| Editar sequência | `npm run workflow:edit` | Com o bot parado, abre o JSON ativo e valida ao fechar |
 | Alterar número | `npm run config:number` | Pergunta o novo número |
 | Alterar número diretamente | `npm run config:number -- 5511999999999` | Valida e pede confirmação |
 | Reconectar | `npm run reconnect` | Reutiliza credenciais ou oferece novo QR |
@@ -324,14 +324,26 @@ Se o logout remoto não puder ser confirmado, remova o computador manualmente em
 
 ## Editar mensagens e o workflow
 
-As preferências do usuário ficam no arquivo `config.json` do diretório privado:
+Para mostrar a sequência ativa, incluindo mensagens, esperas e envio do PDF:
+
+```bash
+npm run workflow:show
+```
+
+Para editar, pare o bot com `Ctrl+C` e execute:
+
+```bash
+npm run workflow:edit
+```
+
+O comando abre o arquivo ativo no editor do sistema e valida a configuração quando ele é fechado. Se preferir editar manualmente, as preferências ficam no arquivo `config.json` do diretório privado:
 
 | Sistema | Arquivo ativo |
 | --- | --- |
 | Windows | `%LOCALAPPDATA%\latam-name-correction-bot\config.json` |
 | macOS | `~/Library/Application Support/latam-name-correction-bot/config.json` |
 
-O comando `npm run status` mostra o caminho exato usado nesta máquina.
+Os comandos `npm run workflow:show` e `npm run status` mostram o caminho exato usado nesta máquina.
 
 Pare o bot antes de editar. O arquivo é JSON puro e não aceita comentários. Depois de salvar, valide e reinicie:
 
@@ -419,13 +431,9 @@ Por padrão, o servidor escuta somente em:
 http://127.0.0.1:3000
 ```
 
-Esse endereço só funciona na própria máquina. Para receber requisições de um sistema em nuvem, mantenha `npm start` aberto e execute em outro terminal:
+Esse endereço só funciona na própria máquina. O próprio `npm start` verifica a rota `/health`, cria um Cloudflare Quick Tunnel e imprime a URL HTTPS completa que deve ser cadastrada no sistema externo.
 
-```bash
-npm run tunnel
-```
-
-O comando verifica a rota `/health`, cria um Cloudflare Quick Tunnel e imprime a URL HTTPS completa que deve ser cadastrada no sistema externo. Não altere `server.host` para `0.0.0.0`: o túnel acessa o servidor local diretamente, e manter o bind em `127.0.0.1` evita exposição desnecessária na rede local.
+Não altere `server.host` para `0.0.0.0`: o túnel acessa o servidor local diretamente, e manter o bind em `127.0.0.1` evita exposição desnecessária na rede local. O comando separado `npm run tunnel` permanece disponível apenas para diagnóstico manual.
 
 O túnel é temporário, não possui garantia de disponibilidade e recebe uma URL diferente a cada inicialização. Para uma URL fixa em produção, configure um Cloudflare Tunnel nomeado em uma conta própria. O projeto não automatiza credenciais ou DNS de terceiros.
 

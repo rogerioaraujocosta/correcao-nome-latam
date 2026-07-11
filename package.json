@@ -19,6 +19,8 @@
   "scripts": {
     "start": "node src/cli.js start",
     "tunnel": "node src/cli.js tunnel",
+    "workflow:show": "node src/cli.js workflow-show",
+    "workflow:edit": "node src/cli.js workflow-edit",
     "setup": "node src/cli.js setup",
     "config:number": "node src/cli.js number",
     "reconnect": "node src/cli.js reconnect",

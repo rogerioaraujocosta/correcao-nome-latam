@@ -3,6 +3,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
+import { spawn } from 'node:child_process'
 import { createInterface } from 'node:readline/promises'
 
 import { runBot } from './app.js'
@@ -360,6 +361,48 @@ async function commandTokenShow() {
   console.log(token)
 }
 
+function workflowAction(step) {
+  if (step.terminal === 'success') return 'Concluir trabalho'
+  if (step.send?.kind === 'document') return `Enviar PDF (${step.send.fileName})`
+  if (step.send?.kind === 'text') return `Enviar: ${step.send.value}`
+  return '-'
+}
+
+async function commandWorkflowShow() {
+  const config = await loadConfig(paths)
+  console.log(`Configuração ativa: ${paths.config}`)
+  console.log(`Timeout por resposta: ${config.workflow.stepTimeoutMinutes} min | Timeout total: ${config.workflow.jobTimeoutMinutes} min`)
+  console.table(config.workflow.steps.map((step, index) => ({
+    ordem: index + 1,
+    id: step.id,
+    aguarda: step.await.mode,
+    ação: workflowAction(step),
+  })))
+  console.log('Para editar: npm run workflow:edit')
+}
+
+function editorCommand(filePath) {
+  if (process.platform === 'win32') return { command: 'notepad.exe', arguments: [filePath] }
+  if (process.platform === 'darwin') return { command: 'open', arguments: ['-W', '-t', filePath] }
+  return { command: process.env.EDITOR || 'nano', arguments: [filePath] }
+}
+
+async function commandWorkflowEdit() {
+  await ensureBotStopped()
+  await initializeLocalStorage(paths)
+  await ensureUserConfig(paths)
+  const editor = editorCommand(paths.config)
+  console.log(`Abrindo a configuração ativa: ${paths.config}`)
+  await new Promise((resolve, reject) => {
+    const child = spawn(editor.command, editor.arguments, { stdio: 'inherit' })
+    child.once('error', reject)
+    child.once('exit', (code) => code === 0 ? resolve() : reject(new Error(`O editor terminou com código ${code}.`)))
+  })
+  await loadConfig(paths, { requireNumber: true })
+  console.log('Configuração válida. As mudanças serão usadas nos novos trabalhos ao executar npm start.')
+  await commandWorkflowShow()
+}
+
 function localHttpHost(configuredHost) {
   if (configuredHost === '0.0.0.0') return '127.0.0.1'
   if (configuredHost === '::') return '[::1]'
@@ -388,6 +431,8 @@ Uso: node src/cli.js <comando>
   setup                         Assistente inicial
   start                         Inicia o webhook e o WhatsApp
   tunnel                        Publica o webhook local em uma URL HTTPS temporária
+  workflow-show                 Mostra a sequência ativa de mensagens
+  workflow-edit                 Abre e valida a sequência ativa no editor
   number [DDI+DDD+número]       Altera o número monitorado
   reconnect                     Reconecta e permite forçar novo QR
   connection-delete             Desvincula e exclui a autenticação local
@@ -405,6 +450,8 @@ async function main() {
     case 'setup': return commandSetup()
     case 'start': return runBot()
     case 'tunnel': return runTunnel()
+    case 'workflow-show': return commandWorkflowShow()
+    case 'workflow-edit': return commandWorkflowEdit()
     case 'number': return commandNumber(arguments_[0])
     case 'reconnect': return commandReconnect()
     case 'connection-delete': return commandConnectionDelete()
