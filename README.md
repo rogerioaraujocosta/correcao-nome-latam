@@ -359,7 +359,7 @@ Para uma alteração pessoal, edite o `config.json` privado, não `config/defaul
 | Passo | Quando é liberado | Ação |
 | --- | --- | --- |
 | `hello` | Trabalho criado e WhatsApp conectado | Envia `Olá` |
-| `reason` | Primeira resposta nova | Envia o motivo da correção |
+| `reason` | Mensagem da LATAM iniciada por “Perfeito! Vou ajudá-lo...” e solicitação de identidade | Envia o motivo da correção |
 | `pnr` | Próxima resposta | Envia `{{pnr}}` |
 | `current_name` | Próxima resposta | Envia `{{currentName}}` |
 | `correct_name` | Próxima resposta | Envia `{{correctName}}` |
@@ -367,7 +367,7 @@ Para uma alteração pessoal, edite o `config.json` privado, não `config/defaul
 | `ticket_pdf` | Próxima resposta | Envia o PDF |
 | `final_confirmation` | Próxima resposta depois do PDF | Conclui o trabalho |
 
-Cada mensagem recebida libera no máximo um passo. O fluxo inicial usa `any_inbound`, isto é, qualquer mensagem nova elegível do número monitorado libera o passo atual. Se o menu da LATAM mudar, isso pode avançar fora de contexto. Depois de observar as respostas reais, prefira `contains` ou `regex` com padrões específicos.
+Cada mensagem recebida libera no máximo um passo. O aviso “Obrigado por aguardar na linha. Estou processando sua solicitação...” é ignorado no passo `reason`; somente a mensagem da LATAM que oferece ajuda e solicita um dado de identidade libera o envio do motivo. Os passos seguintes ainda usam `any_inbound`. Se o menu da LATAM mudar, revise os matchers com `npm run workflow:edit`.
 
 ### Estrutura de um passo
 

@@ -11,6 +11,7 @@ import { WorkflowEngine } from '../src/workflow-engine.js'
 
 const TARGET_NUMBER = '5511999999999'
 const QUIET_LOGGER = { info() {}, warn() {}, error() {} }
+const IDENTITY_REQUEST = 'Perfeito! Vou ajudá-lo a corrigir o nome na sua reserva. Para validar sua identidade, preciso de um dos seguintes dados:'
 
 class MockWhatsApp {
   constructor() {
@@ -66,7 +67,7 @@ async function createHarness(t, mutateWorkflow) {
   return { appPaths, config, store, whatsapp, engine, job }
 }
 
-function inbound(id, fromNumber = TARGET_NUMBER, text = 'resposta da LATAM') {
+function inbound(id, fromNumber = TARGET_NUMBER, text = IDENTITY_REQUEST) {
   return { id, fromNumber, text, eligible: true }
 }
 
@@ -122,6 +123,32 @@ test('ignora remetente errado e não consome o próximo passo', async (t) => {
   assert.deepEqual(result, { accepted: false, reason: 'sender' })
   assert.deepEqual(whatsapp.texts, ['Olá'])
   assert.equal((await store.getJob('job-flow')).cursor, 1)
+})
+
+test('ignora aviso de processamento e só envia o motivo após a solicitação de identidade', async (t) => {
+  const { store, whatsapp, engine } = await createHarness(t)
+  await engine.setConnected(true)
+
+  const ignored = await engine.handleInbound({
+    id: 'processing-notice',
+    fromNumber: TARGET_NUMBER,
+    text: 'Obrigado por aguardar na linha. Estou processando sua solicitação e isso pode levar alguns segundos.',
+  })
+  assert.deepEqual(ignored, { accepted: false, reason: 'matcher' })
+  assert.deepEqual(whatsapp.texts, ['Olá'])
+  assert.equal((await store.getJob('job-flow')).cursor, 1)
+
+  const accepted = await engine.handleInbound({
+    id: 'identity-request',
+    fromNumber: TARGET_NUMBER,
+    text: `Perfeito! Vou ajudá-lo a corrigir o nome na sua reserva. Para validar sua identidade, preciso de um dos seguintes dados:
+
+- Endereço de email
+- Número de viajante frequente (LATAM Pass)
+- Número do pedido ou código de reserva (PNR)`,
+  })
+  assert.equal(accepted.accepted, true)
+  assert.deepEqual(whatsapp.texts, ['Olá', 'Preciso corrigir uma letra de um nome na reserva'])
 })
 
 test('deduplica uma mensagem recebida mesmo após avançar de passo', async (t) => {

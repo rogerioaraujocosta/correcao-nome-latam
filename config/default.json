@@ -34,7 +34,10 @@
       {
         "id": "reason",
         "await": {
-          "mode": "any_inbound"
+          "mode": "contains",
+          "anyOf": [
+            "Perfeito! Vou ajudá-lo a corrigir o nome na sua reserva. Para validar sua identidade, preciso de um dos seguintes dados:"
+          ]
         },
         "send": {
           "kind": "text",

@@ -41,6 +41,8 @@ test('a configuração padrão descreve exatamente o fluxo atual', async () => {
   )
   assert.equal(config.workflow.steps[0].await.mode, 'job_created')
   assert.equal(config.workflow.steps[0].send.value, 'Olá')
+  assert.equal(config.workflow.steps[1].await.mode, 'contains')
+  assert.match(config.workflow.steps[1].await.anyOf[0], /validar sua identidade/)
   assert.equal(
     config.workflow.steps[1].send.value,
     'Preciso corrigir uma letra de um nome na reserva',
