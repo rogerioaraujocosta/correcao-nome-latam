@@ -15,6 +15,15 @@ import { createPaths } from '../src/paths.js'
 
 const executeFile = promisify(execFile)
 
+async function currentWindowsSid() {
+  const { stdout } = await executeFile('whoami.exe', ['/user', '/fo', 'csv', '/nh'], {
+    windowsHide: true,
+  })
+  const sid = stdout.match(/S-1-5-(?:\d+-)+\d+/i)?.[0]
+  assert.ok(sid, 'SID do usuário Windows não encontrado')
+  return sid
+}
+
 function assertSafeAclTestDirectory(localDirectory) {
   const temporaryRoot = path.resolve(os.tmpdir())
   const target = path.resolve(localDirectory)
@@ -38,7 +47,8 @@ async function createUnreadableWindowsMarker(t, contents) {
   })
 
   await fs.writeFile(appPaths.sentinel, contents, 'utf8')
-  await executeFile('icacls.exe', [appPaths.sentinel, '/inheritance:r', '/Q'], {
+  const sid = await currentWindowsSid()
+  await executeFile('icacls.exe', [appPaths.sentinel, '/deny', `*${sid}:(RD)`, '/Q'], {
     windowsHide: true,
   })
   await assert.rejects(
