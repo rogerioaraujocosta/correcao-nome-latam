@@ -12,6 +12,7 @@ import { assertSafeManagedChild, initializeLocalStorage } from './local-storage.
 import { readRunningPid } from './pid-lock.js'
 import { paths } from './paths.js'
 import { ensureWebhookToken, readWebhookToken } from './token.js'
+import { runTunnel } from './tunnel.js'
 import {
   assertPathInside,
   maskPhoneNumber,
@@ -386,6 +387,7 @@ Uso: node src/cli.js <comando>
 
   setup                         Assistente inicial
   start                         Inicia o webhook e o WhatsApp
+  tunnel                        Publica o webhook local em uma URL HTTPS temporária
   number [DDI+DDD+número]       Altera o número monitorado
   reconnect                     Reconecta e permite forçar novo QR
   connection-delete             Desvincula e exclui a autenticação local
@@ -402,6 +404,7 @@ async function main() {
   switch (command) {
     case 'setup': return commandSetup()
     case 'start': return runBot()
+    case 'tunnel': return runTunnel()
     case 'number': return commandNumber(arguments_[0])
     case 'reconnect': return commandReconnect()
     case 'connection-delete': return commandConnectionDelete()

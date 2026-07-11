@@ -18,6 +18,7 @@
   },
   "scripts": {
     "start": "node src/cli.js start",
+    "tunnel": "node src/cli.js tunnel",
     "setup": "node src/cli.js setup",
     "config:number": "node src/cli.js number",
     "reconnect": "node src/cli.js reconnect",
@@ -42,7 +43,8 @@
     "multer": "2.2.0",
     "pino": "10.3.1",
     "qrcode": "1.5.4",
-    "safe-regex2": "5.1.1"
+    "safe-regex2": "5.1.1",
+    "untun": "0.1.3"
   },
   "devDependencies": {
     "supertest": "7.2.2"

@@ -5,34 +5,98 @@ Projeto open source para conduzir, em uma conta de WhatsApp autorizada, o fluxo 
 > [!WARNING]
 > Este é um projeto independente e não oficial. Não é afiliado, patrocinado, aprovado ou mantido pela LATAM Airlines Group, pela Meta, pelo WhatsApp ou pelos mantenedores do Baileys. A integração usa uma interface não oficial do WhatsApp e pode parar de funcionar ou provocar restrições na sessão/conta. Use somente uma conta autorizada, sem spam, e respeite os termos aplicáveis, a LGPD e as regras do canal atendido.
 
-## Comece aqui
+## Comece aqui: todos os comandos
 
-> [!IMPORTANT]
-> Se esta é a primeira vez, **não execute `npm start` ainda**. Primeiro faça a instalação abaixo. O comando `npm start` só funciona depois que a pasta do projeto e o Node.js existem.
+O fluxo completo no Windows é este. Os comandos devem ser executados no **PowerShell**, não diretamente no Prompt de Comando (`cmd.exe`).
 
-### 1. Primeira vez no Windows
+### 1. Instalar ou atualizar
 
-Abra o **Windows PowerShell** em qualquer pasta, copie a linha inteira abaixo e pressione `Enter`:
+Abra o Windows PowerShell, cole a linha inteira e pressione `Enter`:
 
 ```powershell
 [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; $arquivo=Join-Path $env:TEMP 'instalar-correcao-nome-latam.ps1'; Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/rogerioaraujocosta/correcao-nome-latam/main/scripts/install-from-github.ps1' -OutFile $arquivo; powershell.exe -NoProfile -ExecutionPolicy Bypass -File $arquivo
 ```
 
-Esse único comando:
+O projeto fica em `%USERPROFILE%\correcao-nome-latam`. O instalador baixa o projeto, verifica o Node.js, instala as dependências, executa os testes e abre a configuração inicial. Se o bot já estiver rodando, a instalação termina com sucesso e preserva a configuração; para reconfigurar, primeiro encerre o bot com `Ctrl+C`.
+
+### 2. Entrar na pasta
+
+```powershell
+cd "$HOME\correcao-nome-latam"
+```
+
+### 3. Configurar o número e conectar o WhatsApp
+
+Na primeira vez:
+
+```powershell
+npm run setup
+```
+
+Informe o número monitorado, confirme a inicialização e leia o QR Code em **WhatsApp > Dispositivos conectados > Conectar um dispositivo**.
+
+### 4. Iniciar o bot e o webhook local
+
+```powershell
+npm start
+```
+
+Mantenha esse terminal aberto. O webhook local ficará em `http://127.0.0.1:3000/webhooks/name-correction`.
+
+### 5. Publicar o webhook para um sistema na nuvem
+
+Com `npm start` aberto, abra um **segundo PowerShell**:
+
+```powershell
+cd "$HOME\correcao-nome-latam"
+npm run tunnel
+```
+
+Na primeira execução, o utilitário pede autorização para baixar o `cloudflared` e aceitar os termos da Cloudflare. Ao final, ele mostra uma URL como:
+
+```text
+https://nome-aleatorio.trycloudflare.com/webhooks/name-correction
+```
+
+Cadastre essa URL no sistema em nuvem e mantenha os dois terminais abertos. A URL é temporária e muda quando o túnel é reiniciado. Todas as requisições continuam exigindo o header `Authorization: Bearer SEU_TOKEN`.
+
+### 6. Mostrar o token do webhook
+
+```powershell
+npm run token:show
+```
+
+### Resumo rápido
+
+| Objetivo | Comando |
+| --- | --- |
+| Instalar/atualizar | linha única do PowerShell acima |
+| Configurar pela primeira vez | `npm run setup` |
+| Iniciar bot e webhook | `npm start` |
+| Criar URL pública HTTPS | `npm run tunnel` em outro terminal |
+| Mostrar token Bearer | `npm run token:show` |
+| Verificar saúde/configuração | `npm run doctor` |
+| Ver estado do bot | `npm run status` |
+| Alterar número monitorado | `npm run config:number` |
+| Reconectar WhatsApp | `npm run reconnect` |
+| Listar trabalhos | `npm run jobs` |
+| Encerrar bot ou túnel | `Ctrl+C` no respectivo terminal |
+
+O instalador:
 
 1. baixa todo o projeto para `%USERPROFILE%\correcao-nome-latam`;
 2. verifica se o Node.js e o npm existem;
 3. oferece a instalação automática do Node 24 quando necessário;
 4. instala as bibliotecas do projeto;
 5. executa os testes;
-6. pergunta o número da LATAM que será monitorado;
-7. mostra o QR Code do WhatsApp no próprio terminal.
+6. abre o assistente quando o bot não está em execução;
+7. pergunta o número monitorado e mostra o QR Code.
 
 Não é necessário instalar Git, Node.js ou npm manualmente.
 
 Se você baixou o ZIP pelo navegador, extraia a pasta e dê dois cliques em `INSTALAR-WINDOWS.cmd`.
 
-### 2. Primeira vez no macOS
+### Instalação no macOS
 
 Abra o **Terminal**, copie a linha inteira e pressione `Enter`:
 
@@ -42,7 +106,7 @@ arquivo="$(mktemp)"; curl --fail --location --proto '=https' --tlsv1.2 'https://
 
 O projeto será baixado para `~/correcao-nome-latam`; os requisitos serão conferidos e o assistente será aberto.
 
-### 3. Para iniciar nas próximas vezes
+### Atalho para iniciar nas próximas vezes
 
 No Windows, abra `%USERPROFILE%\correcao-nome-latam` e dê dois cliques em:
 
@@ -72,6 +136,7 @@ O terminal precisa permanecer aberto enquanto o bot estiver funcionando. Para en
 | --- | --- |
 | Primeira instalação no Windows | Use a linha única da seção **Primeira vez no Windows** |
 | Iniciar depois de instalado | Clique em `INICIAR-WINDOWS.cmd` ou use `npm start` dentro da pasta |
+| Publicar o webhook na internet | Em outro terminal, use `npm run tunnel` |
 | Executar novamente a configuração inicial | `npm run setup` |
 | Alterar o número monitorado | `npm run config:number` |
 | Reconectar ou gerar outro QR | `npm run reconnect` |
@@ -346,13 +411,23 @@ Uma configuração é carregada ao iniciar o processo. Cada trabalho também gua
 
 Uma descrição mais detalhada está em [docs/FLUXO.md](docs/FLUXO.md).
 
-## Webhook local
+## Webhook local e túnel público
 
 Por padrão, o servidor escuta somente em:
 
 ```text
 http://127.0.0.1:3000
 ```
+
+Esse endereço só funciona na própria máquina. Para receber requisições de um sistema em nuvem, mantenha `npm start` aberto e execute em outro terminal:
+
+```bash
+npm run tunnel
+```
+
+O comando verifica a rota `/health`, cria um Cloudflare Quick Tunnel e imprime a URL HTTPS completa que deve ser cadastrada no sistema externo. Não altere `server.host` para `0.0.0.0`: o túnel acessa o servidor local diretamente, e manter o bind em `127.0.0.1` evita exposição desnecessária na rede local.
+
+O túnel é temporário, não possui garantia de disponibilidade e recebe uma URL diferente a cada inicialização. Para uma URL fixa em produção, configure um Cloudflare Tunnel nomeado em uma conta própria. O projeto não automatiza credenciais ou DNS de terceiros.
 
 Obtenha o token com:
 

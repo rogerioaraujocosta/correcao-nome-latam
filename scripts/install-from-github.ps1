@@ -41,47 +41,46 @@ try {
     Write-Host "Instalador do Bot de Correcao de Nome LATAM" -ForegroundColor White
     Write-Host "O projeto sera instalado em: $Destination"
 
-    if (Test-ProjectDirectory -Path $Destination) {
-        Write-Host "O projeto ja esta baixado. A instalacao existente sera utilizada." -ForegroundColor Green
+    $isUpdate = Test-ProjectDirectory -Path $Destination
+    if ($isUpdate) {
+        Write-Host "Uma instalacao existente foi encontrada e sera atualizada." -ForegroundColor Green
     }
-    else {
-        if ((Test-Path -LiteralPath $Destination) -and -not (Test-DirectoryEmpty -Path $Destination)) {
-            throw "A pasta de destino ja existe e contem outros arquivos: $Destination. Escolha uma pasta vazia ou remova o conteudo manualmente."
-        }
-
-        try {
-            [Net.ServicePointManager]::SecurityProtocol =
-                [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
-        }
-        catch {
-            Write-Verbose "O PowerShell atual gerencia TLS automaticamente."
-        }
-
-        $TemporaryDirectory = Join-Path ([IO.Path]::GetTempPath()) ("correcao-nome-latam-" + [Guid]::NewGuid().ToString("N"))
-        New-Item -ItemType Directory -Path $TemporaryDirectory | Out-Null
-        $ArchivePath = Join-Path $TemporaryDirectory "projeto.zip"
-        $ExtractedPath = Join-Path $TemporaryDirectory "extraido"
-
-        Write-Step "Baixando o projeto publico do GitHub"
-        Invoke-WebRequest -UseBasicParsing -Uri $ArchiveUrl -OutFile $ArchivePath
-
-        Write-Step "Extraindo os arquivos"
-        Expand-Archive -LiteralPath $ArchivePath -DestinationPath $ExtractedPath
-        $SourcePath = Join-Path $ExtractedPath "correcao-nome-latam-main"
-        if (-not (Test-ProjectDirectory -Path $SourcePath)) {
-            throw "O arquivo baixado nao contem a estrutura esperada do projeto."
-        }
-
-        if (-not (Test-Path -LiteralPath $Destination)) {
-            New-Item -ItemType Directory -Path $Destination | Out-Null
-        }
-        Get-ChildItem -LiteralPath $SourcePath -Force | Move-Item -Destination $Destination
-
-        if (-not (Test-ProjectDirectory -Path $Destination)) {
-            throw "O projeto nao foi copiado corretamente para $Destination."
-        }
-        Write-Host "Projeto baixado com sucesso." -ForegroundColor Green
+    elseif ((Test-Path -LiteralPath $Destination) -and -not (Test-DirectoryEmpty -Path $Destination)) {
+        throw "A pasta de destino ja existe e contem outros arquivos: $Destination. Escolha uma pasta vazia ou remova o conteudo manualmente."
     }
+
+    try {
+        [Net.ServicePointManager]::SecurityProtocol =
+            [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+    }
+    catch {
+        Write-Verbose "O PowerShell atual gerencia TLS automaticamente."
+    }
+
+    $TemporaryDirectory = Join-Path ([IO.Path]::GetTempPath()) ("correcao-nome-latam-" + [Guid]::NewGuid().ToString("N"))
+    New-Item -ItemType Directory -Path $TemporaryDirectory | Out-Null
+    $ArchivePath = Join-Path $TemporaryDirectory "projeto.zip"
+    $ExtractedPath = Join-Path $TemporaryDirectory "extraido"
+
+    Write-Step $(if ($isUpdate) { "Baixando a versao mais recente do GitHub" } else { "Baixando o projeto publico do GitHub" })
+    Invoke-WebRequest -UseBasicParsing -Uri $ArchiveUrl -OutFile $ArchivePath
+
+    Write-Step "Extraindo os arquivos"
+    Expand-Archive -LiteralPath $ArchivePath -DestinationPath $ExtractedPath
+    $SourcePath = Join-Path $ExtractedPath "correcao-nome-latam-main"
+    if (-not (Test-ProjectDirectory -Path $SourcePath)) {
+        throw "O arquivo baixado nao contem a estrutura esperada do projeto."
+    }
+
+    if (-not (Test-Path -LiteralPath $Destination)) {
+        New-Item -ItemType Directory -Path $Destination | Out-Null
+    }
+    Get-ChildItem -LiteralPath $SourcePath -Force | Copy-Item -Destination $Destination -Recurse -Force
+
+    if (-not (Test-ProjectDirectory -Path $Destination)) {
+        throw "O projeto nao foi copiado corretamente para $Destination."
+    }
+    Write-Host $(if ($isUpdate) { "Projeto atualizado com sucesso." } else { "Projeto baixado com sucesso." }) -ForegroundColor Green
 
     if ($DownloadOnly) {
         Write-Host "Download validado em: $Destination" -ForegroundColor Green

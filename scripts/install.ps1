@@ -370,6 +370,29 @@ function Invoke-NpmStep {
     }
 }
 
+function Get-RunningBotPid {
+    $localDirectory = $env:LATAM_BOT_LOCAL_DIR
+    if ([string]::IsNullOrWhiteSpace($localDirectory)) {
+        $localDirectory = Join-Path $env:LOCALAPPDATA "latam-name-correction-bot"
+    }
+
+    $pidPath = Join-Path $localDirectory "bot.pid"
+    if (-not (Test-Path -LiteralPath $pidPath -PathType Leaf)) {
+        return $null
+    }
+
+    $savedPid = 0
+    if (-not [int]::TryParse((Get-Content -LiteralPath $pidPath -Raw).Trim(), [ref]$savedPid)) {
+        return $null
+    }
+
+    if ($null -eq (Get-Process -Id $savedPid -ErrorAction SilentlyContinue)) {
+        return $null
+    }
+
+    return $savedPid
+}
+
 function Invoke-Main {
     if (-not (Test-Path -LiteralPath (Join-Path $ProjectRoot "package.json") -PathType Leaf)) {
         throw "package.json nao foi encontrado em $ProjectRoot. Execute o script dentro do projeto completo."
@@ -395,6 +418,15 @@ function Invoke-Main {
     else {
         Write-Host $state.Reason -ForegroundColor Yellow
         $state = Install-Node24
+    }
+
+    $runningBotPid = Get-RunningBotPid
+    if ($null -ne $runningBotPid) {
+        Write-Step "Bot em execucao; finalizacao adiada"
+        Write-Host "O bot ja esta em execucao (PID $runningBotPid)." -ForegroundColor Green
+        Write-Host "Os arquivos do projeto foram baixados, mas dependencias e configuracao nao serao alteradas enquanto ele estiver ativo."
+        Write-Host "Encerre o bot com Ctrl+C e execute novamente o instalador para concluir a atualizacao."
+        return
     }
 
     Push-Location $ProjectRoot

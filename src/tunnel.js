@@ -1,0 +1,45 @@
+import { loadConfig } from './config.js'
+import { paths } from './paths.js'
+
+export function localServerUrl(config) {
+  const host = ['0.0.0.0', '::'].includes(config.server.host) ? '127.0.0.1' : config.server.host
+  return `http://${host}:${config.server.port}`
+}
+
+export function publicWebhookUrl(publicUrl) {
+  return `${String(publicUrl).replace(/\/+$/, '')}/webhooks/name-correction`
+}
+
+export async function assertLocalWebhookReady(url, fetchImplementation = fetch) {
+  let response
+  try {
+    response = await fetchImplementation(`${url}/health`, {
+      signal: AbortSignal.timeout(5_000),
+    })
+  } catch {
+    throw new Error(`O servidor local não respondeu em ${url}. Inicie-o primeiro com: npm start`)
+  }
+  if (!response.ok) {
+    throw new Error(`O servidor local respondeu HTTP ${response.status} em ${url}/health.`)
+  }
+}
+
+export async function runTunnel(options = {}) {
+  const config = options.config ?? await loadConfig(paths, { requireNumber: true })
+  const localUrl = localServerUrl(config)
+  await assertLocalWebhookReady(localUrl, options.fetchImplementation)
+
+  console.log(`Servidor local confirmado em ${localUrl}.`)
+  console.log('Na primeira execução, confirme os termos exibidos para baixar o cloudflared oficial.')
+
+  const startTunnel = options.startTunnel ?? (await import('untun')).startTunnel
+  const tunnel = await startTunnel({ url: localUrl })
+  if (!tunnel) throw new Error('A criação do túnel foi cancelada.')
+
+  const publicUrl = await tunnel.getURL()
+  console.log('\nTúnel público pronto. Mantenha este terminal aberto.')
+  console.log(`Webhook: ${publicWebhookUrl(publicUrl)}`)
+  console.log('Autenticação: Authorization: Bearer SEU_TOKEN')
+  console.log('Para mostrar o token em outro terminal: npm run token:show')
+  return tunnel
+}
