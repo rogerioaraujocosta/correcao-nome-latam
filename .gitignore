@@ -1,0 +1,21 @@
+# Dependências e relatórios
+node_modules/
+coverage/
+*.log
+npm-debug.log*
+
+# Todo o estado local do bot (credenciais, token, trabalhos e PDFs)
+.local/*
+!.local/.gitkeep
+
+# Segredos/configurações alternativas
+.env
+.env.*
+!.env.example
+config/local.json
+
+# Sistema/editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

@@ -1,0 +1,50 @@
+{
+  "name": "latam-name-correction-whatsapp-bot",
+  "version": "1.0.0",
+  "description": "Bot local e configurável para conduzir solicitações de correção de nome pelo WhatsApp.",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rogerioaraujocosta/correcao-nome-latam.git"
+  },
+  "homepage": "https://github.com/rogerioaraujocosta/correcao-nome-latam#readme",
+  "bugs": {
+    "url": "https://github.com/rogerioaraujocosta/correcao-nome-latam/issues"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "start": "node src/cli.js start",
+    "setup": "node src/cli.js setup",
+    "config:number": "node src/cli.js number",
+    "reconnect": "node src/cli.js reconnect",
+    "connection:delete": "node src/cli.js connection-delete",
+    "status": "node src/cli.js status",
+    "jobs": "node src/cli.js jobs",
+    "token:show": "node src/cli.js token-show",
+    "doctor": "node src/cli.js doctor",
+    "test": "node --test --test-concurrency=1",
+    "test:coverage": "node --test --experimental-test-coverage --test-concurrency=1"
+  },
+  "keywords": [
+    "baileys",
+    "whatsapp",
+    "latam",
+    "bot",
+    "name-correction"
+  ],
+  "dependencies": {
+    "@whiskeysockets/baileys": "7.0.0-rc13",
+    "express": "5.2.1",
+    "multer": "2.2.0",
+    "pino": "10.3.1",
+    "qrcode": "1.5.4",
+    "safe-regex2": "5.1.1"
+  },
+  "devDependencies": {
+    "supertest": "7.1.4"
+  }
+}

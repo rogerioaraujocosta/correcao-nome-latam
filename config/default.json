@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "server": {
+    "host": "127.0.0.1",
+    "port": 3000,
+    "maxUploadMb": 16
+  },
+  "whatsapp": {
+    "monitoredNumber": "",
+    "reconnect": {
+      "enabled": true,
+      "maxAttempts": 0,
+      "baseDelayMs": 2000,
+      "maxDelayMs": 30000
+    }
+  },
+  "storage": {
+    "retentionDays": 30
+  },
+  "workflow": {
+    "stepTimeoutMinutes": 5,
+    "jobTimeoutMinutes": 30,
+    "steps": [
+      {
+        "id": "hello",
+        "await": {
+          "mode": "job_created"
+        },
+        "send": {
+          "kind": "text",
+          "value": "Olá"
+        }
+      },
+      {
+        "id": "reason",
+        "await": {
+          "mode": "any_inbound"
+        },
+        "send": {
+          "kind": "text",
+          "value": "Preciso corrigir uma letra de um nome na reserva"
+        }
+      },
+      {
+        "id": "pnr",
+        "await": {
+          "mode": "any_inbound"
+        },
+        "send": {
+          "kind": "text",
+          "value": "{{pnr}}"
+        }
+      },
+      {
+        "id": "current_name",
+        "await": {
+          "mode": "any_inbound"
+        },
+        "send": {
+          "kind": "text",
+          "value": "{{currentName}}"
+        }
+      },
+      {
+        "id": "correct_name",
+        "await": {
+          "mode": "any_inbound"
+        },
+        "send": {
+          "kind": "text",
+          "value": "{{correctName}}"
+        }
+      },
+      {
+        "id": "confirmation",
+        "await": {
+          "mode": "any_inbound"
+        },
+        "send": {
+          "kind": "text",
+          "value": "SIM"
+        }
+      },
+      {
+        "id": "ticket_pdf",
+        "await": {
+          "mode": "any_inbound"
+        },
+        "send": {
+          "kind": "document",
+          "sourceField": "ticketPdf",
+          "fileName": "bilhete-{{pnr}}.pdf"
+        }
+      },
+      {
+        "id": "final_confirmation",
+        "await": {
+          "mode": "any_inbound"
+        },
+        "terminal": "success"
+      }
+    ]
+  }
+}
