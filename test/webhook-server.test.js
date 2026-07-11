@@ -102,6 +102,26 @@ test('cria um trabalho, envia Olá e trata repetição idempotente sem novo envi
   assert.equal((await fs.readdir(appPaths.uploads)).length, 1)
 })
 
+test('cria trabalhos distintos quando Idempotency-Key e requestId não são enviados', async (t) => {
+  const { store, app } = await createHarness(t)
+  const sendWithoutKey = () => request(app)
+    .post('/api/jobs')
+    .set('Authorization', AUTHORIZATION)
+    .field('pnr', 'QWEBZI')
+    .field('currentName', 'JANDELA')
+    .field('correctName', 'DANIELA')
+    .attach('ticket', VALID_PDF, { filename: 'bilhete.pdf', contentType: 'application/pdf' })
+
+  const first = await sendWithoutKey().expect(202)
+  const second = await sendWithoutKey().expect(202)
+
+  assert.equal(first.body.created, true)
+  assert.equal(second.body.created, true)
+  assert.notEqual(first.body.job.requestId, second.body.job.requestId)
+  assert.equal(first.body.job.requestId.length, 36)
+  assert.equal((await store.listJobs()).length, 2)
+})
+
 test('recusa PDF inválido ou ausente sem persistir trabalho', async (t) => {
   const { appPaths, store, app } = await createHarness(t)
 

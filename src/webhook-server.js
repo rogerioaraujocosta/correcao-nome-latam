@@ -52,7 +52,7 @@ function decodeBase64Pdf(value, maximumBytes) {
 function requestIdFrom(request) {
   const value = request.get('idempotency-key') ?? request.body?.requestId ?? crypto.randomUUID()
   if (typeof value !== 'string' || !/^[A-Za-z0-9._:-]{8,128}$/.test(value)) {
-    throw Object.assign(new Error('Idempotency-Key deve ter de 8 a 128 caracteres seguros.'), { statusCode: 400 })
+    throw Object.assign(new Error('Idempotency-Key ou requestId deve ter de 8 a 128 caracteres seguros.'), { statusCode: 400 })
   }
   return value
 }

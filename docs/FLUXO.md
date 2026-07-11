@@ -119,7 +119,7 @@ Uma mensagem recebida só pode avançar o trabalho quando todas estas condiçõe
 
 Deve existir no máximo um trabalho ativo por combinação de conexão e número monitorado. Trabalhos adicionais permanecem em fila. Isso é necessário porque a conversa do WhatsApp não fornece um identificador de correção confiável para separar dois PNRs simultâneos.
 
-Como há uma única conexão local, o ledger persistente usa `{targetNumber, messageId}` como chave global, atravessando trabalhos e reinícios. Cada trabalho mantém também sua lista curta de IDs consumidos. O webhook usa uma chave de idempotência própria. Eventos de sincronização de histórico não liberam etapas; o transporte registra o timestamp remoto quando disponível e carimba todas as mensagens de um mesmo lote com o mesmo instante local, impedindo que duas mensagens do lote avancem dois passos.
+Como há uma única conexão local, o ledger persistente usa `{targetNumber, messageId}` como chave global, atravessando trabalhos e reinícios. Cada trabalho mantém também sua lista curta de IDs consumidos. O webhook gera um identificador aleatório quando o cliente não fornece a chave opcional de idempotência. Eventos de sincronização de histórico não liberam etapas; o transporte registra o timestamp remoto quando disponível e carimba todas as mensagens de um mesmo lote com o mesmo instante local, impedindo que duas mensagens do lote avancem dois passos.
 
 ## Timeouts, reconexão e retenção
 

@@ -476,9 +476,9 @@ Um trabalho novo normalmente retorna HTTP `202`. Repetir a mesma chave de idempo
 | `ticket` | Sim, em multipart | PDF válido enviado como arquivo |
 | `ticketPdfBase64` | Sim, em JSON | PDF em Base64, com ou sem prefixo `data:application/pdf;base64,` |
 | `ticketFileName` | Não | Nome terminado em `.pdf`; padrão `bilhete-PNR.pdf` |
-| `requestId` | Não | Alternativa à chave no header |
+| `requestId` | Não | Identificador opcional para deduplicação; omita para criar sempre um trabalho novo |
 
-Envie também `Idempotency-Key`, com 8–128 caracteres usando letras, números, `.`, `_`, `:`, ou `-`. Reutilize a mesma chave ao repetir uma requisição cujo resultado ficou incerto.
+Não é necessário enviar `Idempotency-Key` nem `requestId`. Quando ambos são omitidos, o servidor gera um identificador interno aleatório e cada POST válido cria um novo trabalho. Use `Idempotency-Key` apenas se desejar proteção opcional contra repetição acidental da mesma requisição.
 
 O PDF precisa começar com a assinatura `%PDF-`. O limite padrão é 16 MB. A rota reserva espaço para a expansão de aproximadamente 33% do Base64, mas esse formato consome mais memória; prefira multipart para arquivos maiores.
 
@@ -492,7 +492,6 @@ TOKEN="$(npm run --silent token:show)"
 curl --fail-with-body \
   --request POST 'http://127.0.0.1:3000/api/jobs' \
   --header "Authorization: Bearer ${TOKEN}" \
-  --header 'Idempotency-Key: corr-QWEBZI-20260711-001' \
   --form 'pnr=QWEBZI' \
   --form 'currentName=JANDELA' \
   --form 'correctName=DANIELA' \
@@ -507,7 +506,6 @@ No Windows PowerShell também é possível usar `curl.exe` com os mesmos headers
 $token = ((npm run --silent token:show) | Select-Object -Last 1).Trim()
 $headers = @{
     Authorization = "Bearer $token"
-    'Idempotency-Key' = 'corr-QWEBZI-20260711-002'
 }
 $form = @{
     pnr = 'QWEBZI'
@@ -538,7 +536,6 @@ PDF_BASE64="$(base64 < '/caminho/bilhete.pdf' | tr -d '\r\n')"
 curl --fail-with-body \
   --request POST 'http://127.0.0.1:3000/webhooks/name-correction' \
   --header "Authorization: Bearer ${TOKEN}" \
-  --header 'Idempotency-Key: corr-QWEBZI-20260711-003' \
   --header 'Content-Type: application/json' \
   --data-binary @- <<JSON
 {
@@ -573,7 +570,6 @@ $request = @{
     Uri = 'http://127.0.0.1:3000/webhooks/name-correction'
     Headers = @{
         Authorization = "Bearer $token"
-        'Idempotency-Key' = 'corr-QWEBZI-20260711-004'
     }
     ContentType = 'application/json'
     Body = $body
@@ -768,7 +764,7 @@ Obtenha novamente o token com `npm run token:show` e envie exatamente `Authoriza
 
 ### A primeira mensagem não foi enviada
 
-Consulte `/health` e `npm run jobs`. Quando o WhatsApp está desconectado, o trabalho permanece `queued` e o `Olá` é enviado depois da conexão. Não crie outro trabalho: repita a mesma `Idempotency-Key` para consultar o resultado existente.
+Consulte `/health` e `npm run jobs`. Quando o WhatsApp está desconectado, o trabalho permanece `queued` e o `Olá` é enviado depois da conexão. Evite reenviar o POST nesse caso, pois sem uma chave opcional de idempotência cada envio cria um novo trabalho.
 
 ### Respostas não avançam o fluxo
 
