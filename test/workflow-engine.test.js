@@ -132,7 +132,12 @@ test('ignora aviso de processamento e só envia o motivo após a solicitação d
     fromNumber: TARGET_NUMBER,
     text: 'Obrigado por aguardar na linha. Estou processando sua solicitação e isso pode levar alguns segundos.',
   })
-  assert.deepEqual(ignored, { accepted: false, reason: 'matcher' })
+  assert.deepEqual(ignored, {
+    accepted: false,
+    reason: 'processing_notice',
+    jobId: 'job-flow',
+    stepId: 'reason',
+  })
   assert.deepEqual(whatsapp.texts, ['Olá'])
   assert.equal((await store.getJob('job-flow')).cursor, 1)
 

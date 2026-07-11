@@ -2,6 +2,7 @@ import { normalizeMatchText, redactError, renderTemplate, sanitizeFileName } fro
 import safeRegex from 'safe-regex2'
 
 const RESUMABLE_STATUSES = new Set(['timed_out', 'manual_intervention'])
+const PROCESSING_NOTICE = 'estou processando sua solicitacao'
 
 function isoNow() {
   return new Date().toISOString()
@@ -124,6 +125,9 @@ export class WorkflowEngine {
         return { accepted: true, completed: true, jobId: job.id, ruleId: inboundRule.id }
       }
       if (!step || step.await?.mode === 'job_created' || !messageMatches(step.await, message)) {
+        if (step?.id === 'reason' && normalizeMatchText(message.text).includes(PROCESSING_NOTICE)) {
+          return { accepted: false, reason: 'processing_notice', jobId: job.id, stepId: step.id }
+        }
         return { accepted: false, reason: 'matcher' }
       }
 

@@ -71,8 +71,10 @@ export async function startBot({
           const result = await engine?.handleInbound(message)
           if (result?.accepted) {
             logger.info({ event: 'inbound_accepted', stepId: result.stepId, ruleId: result.ruleId }, 'Resposta da LATAM aceita pelo fluxo')
+          } else if (result?.reason === 'processing_notice') {
+            logger.info({ event: 'processing_notice_ignored', stepId: result.stepId }, 'Aviso de processamento ignorado conforme a regra; aguardando validacao de identidade')
           } else {
-            logger.info({ event: 'inbound_ignored', reason: result?.reason }, 'Resposta da LATAM recebida, mas não liberou o passo')
+            logger.info({ event: 'inbound_ignored', reason: result?.reason }, 'Resposta da LATAM recebida, mas o matcher nao liberou o passo')
           }
         } catch (error) {
           logger.error({ error: redactError(error) }, 'Falha ao avançar o fluxo; o trabalho foi preservado')
