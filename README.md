@@ -7,102 +7,71 @@ Projeto open source para conduzir, em uma conta de WhatsApp autorizada, o fluxo 
 
 ## Comece aqui
 
-### Para iniciar o bot no dia a dia
+> [!IMPORTANT]
+> Se esta é a primeira vez, **não execute `npm start` ainda**. Primeiro faça a instalação abaixo. O comando `npm start` só funciona depois que a pasta do projeto e o Node.js existem.
 
-Se o projeto **já foi instalado e configurado**, abra um terminal dentro da pasta do projeto e execute somente:
+### 1. Primeira vez no Windows
 
-```bash
-npm start
+Abra o **Windows PowerShell** em qualquer pasta, copie a linha inteira abaixo e pressione `Enter`:
+
+```powershell
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; $arquivo=Join-Path $env:TEMP 'instalar-correcao-nome-latam.ps1'; Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/rogerioaraujocosta/correcao-nome-latam/main/scripts/install-from-github.ps1' -OutFile $arquivo; powershell.exe -NoProfile -ExecutionPolicy Bypass -File $arquivo
 ```
 
-O terminal precisa permanecer aberto enquanto o bot estiver funcionando. Para encerrar com segurança, pressione `Ctrl+C`.
+Esse único comando:
 
-Se o terminal não estiver na pasta do projeto, use o comando completo do seu sistema:
+1. baixa todo o projeto para `%USERPROFILE%\correcao-nome-latam`;
+2. verifica se o Node.js e o npm existem;
+3. oferece a instalação automática do Node 24 quando necessário;
+4. instala as bibliotecas do projeto;
+5. executa os testes;
+6. pergunta o número da LATAM que será monitorado;
+7. mostra o QR Code do WhatsApp no próprio terminal.
 
-Windows PowerShell:
+Não é necessário instalar Git, Node.js ou npm manualmente.
+
+Se você baixou o ZIP pelo navegador, extraia a pasta e dê dois cliques em `INSTALAR-WINDOWS.cmd`.
+
+### 2. Primeira vez no macOS
+
+Abra o **Terminal**, copie a linha inteira e pressione `Enter`:
+
+```bash
+arquivo="$(mktemp)"; curl --fail --location --proto '=https' --tlsv1.2 'https://raw.githubusercontent.com/rogerioaraujocosta/correcao-nome-latam/main/scripts/install-from-github.sh' --output "$arquivo" && /bin/bash "$arquivo"; codigo=$?; rm -f -- "$arquivo"; test $codigo -eq 0
+```
+
+O projeto será baixado para `~/correcao-nome-latam`; os requisitos serão conferidos e o assistente será aberto.
+
+### 3. Para iniciar nas próximas vezes
+
+No Windows, abra `%USERPROFILE%\correcao-nome-latam` e dê dois cliques em:
+
+```text
+INICIAR-WINDOWS.cmd
+```
+
+Esse arquivo verifica a instalação e abre automaticamente o instalador ou o assistente caso algo ainda esteja faltando.
+
+Ou use o comando completo no PowerShell:
 
 ```powershell
 Set-Location -LiteralPath (Join-Path $HOME 'correcao-nome-latam'); npm start
 ```
 
-macOS:
+No macOS, dê dois cliques em `INICIAR-MAC.command` ou execute:
 
 ```bash
 cd "$HOME/correcao-nome-latam" && npm start
 ```
 
-### Primeira instalação: baixar do GitHub e configurar
-
-#### Windows — PowerShell
-
-O bloco abaixo baixa todo o projeto do GitHub para a pasta `correcao-nome-latam` do usuário, entra nela e inicia o instalador guiado. Não é necessário ter Git nem Node.js previamente instalado.
-
-Copie e cole o bloco inteiro no PowerShell:
-
-```powershell
-$repo = 'https://github.com/rogerioaraujocosta/correcao-nome-latam'
-$destino = Join-Path $HOME 'correcao-nome-latam'
-$temporario = Join-Path ([IO.Path]::GetTempPath()) ('correcao-nome-latam-' + [guid]::NewGuid().ToString('N'))
-if (Test-Path -LiteralPath $destino) { throw "A pasta já existe: $destino" }
-New-Item -ItemType Directory -Path $temporario | Out-Null
-try {
-    $zip = Join-Path $temporario 'projeto.zip'
-    Invoke-WebRequest -Uri "$repo/archive/refs/heads/main.zip" -OutFile $zip
-    Expand-Archive -LiteralPath $zip -DestinationPath $temporario
-    Move-Item -LiteralPath (Join-Path $temporario 'correcao-nome-latam-main') -Destination $destino
-}
-finally {
-    if (Test-Path -LiteralPath $temporario) {
-        Remove-Item -LiteralPath $temporario -Recurse -Force
-    }
-}
-Set-Location -LiteralPath $destino
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install.ps1
-```
-
-#### macOS — Terminal
-
-O bloco abaixo baixa todo o projeto para `~/correcao-nome-latam`, entra na pasta e inicia o instalador guiado. Não é necessário ter Git nem Node.js previamente instalado.
-
-Copie e cole o bloco inteiro no Terminal:
-
-```bash
-REPO='https://github.com/rogerioaraujocosta/correcao-nome-latam'
-DESTINO="$HOME/correcao-nome-latam"
-test ! -e "$DESTINO" || { echo "A pasta já existe: $DESTINO"; exit 1; }
-TEMPORARIO="$(mktemp -d)" || exit 1
-trap 'rm -rf -- "$TEMPORARIO"' EXIT
-curl --fail --location --proto '=https' --tlsv1.2 \
-  "$REPO/archive/refs/heads/main.zip" \
-  --output "$TEMPORARIO/projeto.zip" || exit 1
-unzip -q "$TEMPORARIO/projeto.zip" -d "$TEMPORARIO" || exit 1
-mv "$TEMPORARIO/correcao-nome-latam-main" "$DESTINO" || exit 1
-rm -rf -- "$TEMPORARIO"
-trap - EXIT
-cd "$DESTINO" || exit 1
-/bin/bash ./scripts/install.sh
-```
-
-### O que acontece na primeira instalação
-
-O instalador verifica o Node.js, oferece a instalação automática do Node 24 LTS quando necessário, instala as dependências, executa os testes e abre o assistente de configuração. No assistente:
-
-1. informe o número da conversa da LATAM que será monitorada, com DDI e DDD;
-2. conclua a configuração;
-3. execute `npm start`;
-4. leia o QR Code mostrado no terminal em **WhatsApp > Dispositivos conectados > Conectar um dispositivo**.
-
-Depois disso, nas próximas utilizações, o único comando necessário para iniciar será:
-
-```bash
-npm start
-```
+O terminal precisa permanecer aberto enquanto o bot estiver funcionando. Para encerrar com segurança, pressione `Ctrl+C`.
 
 ### Comandos principais
 
 | Objetivo | Comando |
 | --- | --- |
-| Iniciar o bot | `npm start` |
+| Primeira instalação no Windows | Use a linha única da seção **Primeira vez no Windows** |
+| Iniciar depois de instalado | Clique em `INICIAR-WINDOWS.cmd` ou use `npm start` dentro da pasta |
 | Executar novamente a configuração inicial | `npm run setup` |
 | Alterar o número monitorado | `npm run config:number` |
 | Reconectar ou gerar outro QR | `npm run reconnect` |
@@ -146,7 +115,7 @@ Não é necessário instalar Node.js antes de executar os scripts do projeto: o 
 
 ## Detalhes da instalação (consulta)
 
-Para instalar sem ler os detalhes técnicos, use os blocos de **Primeira instalação** no começo deste README. Esta seção explica o que os instaladores fazem. O pacote baixado precisa conter `package.json` e `package-lock.json`.
+Para instalar sem ler os detalhes técnicos, use a linha única de **Primeira vez** no começo deste README. Esta seção explica o que os instaladores fazem. O pacote baixado precisa conter `package.json` e `package-lock.json`.
 
 ### Windows
 
@@ -645,6 +614,14 @@ npm run status
 node --version
 npm --version
 ```
+
+### Erro `ENOENT` ou `package.json não foi encontrado`
+
+Isso significa que `npm start` foi executado antes da primeira instalação ou fora da pasta do projeto. Não tente instalar pacotes manualmente nessa pasta.
+
+- Se nunca instalou: volte ao início deste README e execute a linha de **Primeira vez no Windows** ou **Primeira vez no macOS**.
+- Se já instalou no Windows: dê dois cliques em `%USERPROFILE%\correcao-nome-latam\INICIAR-WINDOWS.cmd`.
+- Se já instalou no macOS: execute `cd "$HOME/correcao-nome-latam" && npm start`.
 
 ### `package-lock.json não foi encontrado`
 

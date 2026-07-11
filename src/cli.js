@@ -121,7 +121,7 @@ async function commandSetup() {
   console.log(token)
   console.log(`Fluxo editável: ${paths.config}`)
 
-  if (await confirm('Iniciar o bot agora e mostrar o QR Code no terminal?', false)) {
+  if (await confirm('Iniciar o bot agora e mostrar o QR Code no terminal?', true)) {
     promptInterface?.close()
     promptInterface = undefined
     promptIterator = undefined

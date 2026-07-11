@@ -136,6 +136,7 @@ O bind padrão local não transforma o webhook em uma fronteira de segurança su
 
 - Use Node.js 22+; Node.js 24 LTS é recomendado.
 - O fallback direto baixa Node de `https://nodejs.org` e verifica SHA-256 e assinatura de plataforma; no Windows, o caminho preferencial delega a instalação à fonte oficial do WinGet.
+- O comando de primeira instalação salva o bootstrap do repositório público em um arquivo temporário antes de executá-lo; ele não usa `Invoke-Expression` nem `curl | shell`. A origem é a branch pública `main` deste repositório via HTTPS.
 - No Windows, nunca use `--ignore-security-hash` no WinGet.
 - No macOS, não contorne falha de `pkgutil --check-signature`.
 - Instale dependências com `npm ci` e mantenha `package-lock.json` revisado.
