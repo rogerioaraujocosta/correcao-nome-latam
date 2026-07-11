@@ -97,7 +97,7 @@ export async function startBot({
       logger.warn('O servidor não está limitado ao computador local. Use firewall, TLS e rotação do token.')
     }
 
-    publicTunnel = await tunnelFactory({ config })
+    publicTunnel = await tunnelFactory({ config, token })
 
     await whatsapp.start()
 

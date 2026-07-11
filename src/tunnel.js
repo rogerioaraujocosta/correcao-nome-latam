@@ -1,5 +1,6 @@
 import { loadConfig } from './config.js'
 import { paths } from './paths.js'
+import { readWebhookToken } from './token.js'
 
 export function localServerUrl(config) {
   const host = ['0.0.0.0', '::'].includes(config.server.host) ? '127.0.0.1' : config.server.host
@@ -8,6 +9,34 @@ export function localServerUrl(config) {
 
 export function publicWebhookUrl(publicUrl) {
   return `${String(publicUrl).replace(/\/+$/, '')}/webhooks/name-correction`
+}
+
+export function startupSummary({ publicUrl, token, config }) {
+  const webhookUrl = publicWebhookUrl(publicUrl)
+  const examplePayload = {
+    pnr: 'QWEBZI',
+    currentName: 'NOME ATUAL DO PASSAGEIRO',
+    correctName: 'NOME CORRETO DO PASSAGEIRO',
+  }
+  return [
+    '',
+    '============================================================',
+    'BOT LATAM PRONTO',
+    '============================================================',
+    `Número monitorado: ${config.whatsapp.monitoredNumber}`,
+    `Servidor local: ${localServerUrl(config)}`,
+    'Método: POST',
+    `Webhook público: ${webhookUrl}`,
+    'Content-Type: application/json',
+    `Token: ${token}`,
+    `Authorization: Bearer ${token}`,
+    '',
+    'Payload de exemplo (sem PDF e sem Idempotency-Key):',
+    JSON.stringify(examplePayload, null, 2),
+    '============================================================',
+    'Mantenha este terminal aberto. Para encerrar, pressione Ctrl+C.',
+    '',
+  ].join('\n')
 }
 
 export async function assertLocalWebhookReady(url, fetchImplementation = fetch) {
@@ -26,6 +55,7 @@ export async function assertLocalWebhookReady(url, fetchImplementation = fetch) 
 
 export async function runTunnel(options = {}) {
   const config = options.config ?? await loadConfig(paths, { requireNumber: true })
+  const token = options.token ?? await readWebhookToken(paths)
   const localUrl = localServerUrl(config)
   await assertLocalWebhookReady(localUrl, options.fetchImplementation)
 
@@ -37,9 +67,6 @@ export async function runTunnel(options = {}) {
   if (!tunnel) throw new Error('A criação do túnel foi cancelada.')
 
   const publicUrl = await tunnel.getURL()
-  console.log('\nTúnel público pronto. Mantenha este terminal aberto.')
-  console.log(`Webhook: ${publicWebhookUrl(publicUrl)}`)
-  console.log('Autenticação: Authorization: Bearer SEU_TOKEN')
-  console.log('Para mostrar o token em outro terminal: npm run token:show')
+  console.log(startupSummary({ publicUrl, token, config }))
   return tunnel
 }

@@ -39,9 +39,10 @@ test('npm start inicia e encerra o túnel junto com o webhook', async (t) => {
   const controller = await startBot({
     appPaths,
     logger: QUIET_LOGGER,
-    tunnelFactory: async ({ config: activeConfig }) => {
+    tunnelFactory: async ({ config: activeConfig, token }) => {
       const response = await fetch(`http://127.0.0.1:${activeConfig.server.port}/health`)
       assert.equal(response.status, 200)
+      assert.match(token, /^[a-f0-9]{64}$/)
       tunnelStarted = true
       return { close: async () => { tunnelClosed = true } }
     },

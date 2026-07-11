@@ -144,13 +144,13 @@ O terminal precisa permanecer aberto enquanto o bot estiver funcionando. Para en
 ## O que o projeto faz
 
 - Lê o QR Code no próprio terminal e mantém a autenticação somente na máquina do usuário.
-- Expõe um webhook HTTP local autenticado para receber PNR, nomes e o PDF do bilhete.
+- Expõe um webhook HTTP local autenticado para receber PNR, nome atual e nome correto.
 - Envia `Olá` quando um trabalho entra na fila e o WhatsApp está conectado.
 - Aguarda uma resposta nova do número monitorado antes de enviar cada mensagem seguinte.
 - Ignora mensagens de outros números, grupos e histórico sincronizado; uma mensagem manual enviada pela própria conta pausa o trabalho para revisão.
 - Mantém fila, idempotência, timeouts e estados de recuperação para evitar reenvios cegos.
 - Permite alterar o número monitorado, reconectar, forçar novo QR e excluir a conexão.
-- Mantém credenciais, token, PDFs, configuração pessoal e trabalhos na área privada do usuário, fora do repositório Git.
+- Mantém credenciais, token, configuração pessoal e trabalhos na área privada do usuário, fora do repositório Git.
 
 O QR Code **não gera um webhook**. São duas partes diferentes:
 
@@ -158,7 +158,7 @@ O QR Code **não gera um webhook**. São duas partes diferentes:
 flowchart LR
     A["Sistema ou operador"] -->|"POST local + Bearer token"| B["Webhook HTTP"]
     B --> C["Fila e workflow local"]
-    C -->|"mensagens e PDF"| D["Baileys"]
+    C -->|"mensagens"| D["Baileys"]
     D --> E["Conversa com o número monitorado"]
     E -->|"respostas novas"| D
     D -->|"messages.upsert filtrado"| C
@@ -268,7 +268,7 @@ Os comandos de alteração exigem o bot parado. Consultas como `workflow:show`, 
 | --- | --- | --- |
 | Iniciar | `npm start` | Abre webhook, túnel público e WhatsApp; reutiliza a sessão local quando possível |
 | Configuração inicial | `npm run setup` | Configura número, token e oferece QR |
-| Mostrar sequência | `npm run workflow:show` | Exibe em tabela todas as esperas, mensagens e o PDF |
+| Mostrar sequência | `npm run workflow:show` | Exibe em tabela todas as esperas e mensagens |
 | Editar sequência | `npm run workflow:edit` | Com o bot parado, abre o JSON ativo e valida ao fechar |
 | Alterar número | `npm run config:number` | Pergunta o novo número |
 | Alterar número diretamente | `npm run config:number -- 5511999999999` | Valida e pede confirmação |
@@ -324,7 +324,7 @@ Se o logout remoto não puder ser confirmado, remova o computador manualmente em
 
 ## Editar mensagens e o workflow
 
-Para mostrar a sequência ativa, incluindo mensagens, esperas e envio do PDF:
+Para mostrar a sequência ativa, incluindo mensagens e esperas:
 
 ```bash
 npm run workflow:show
@@ -364,8 +364,7 @@ Para uma alteração pessoal, edite o `config.json` privado, não `config/defaul
 | `current_name` | Próxima resposta | Envia `{{currentName}}` |
 | `correct_name` | Próxima resposta | Envia `{{correctName}}` |
 | `confirmation` | Próxima resposta | Envia `SIM` |
-| `ticket_pdf` | Próxima resposta | Envia o PDF |
-| `final_confirmation` | Próxima resposta depois do PDF | Conclui o trabalho |
+| `final_confirmation` | Próxima resposta | Conclui o trabalho |
 
 Cada mensagem recebida libera no máximo um passo. O aviso “Obrigado por aguardar na linha. Estou processando sua solicitação...” é ignorado no passo `reason`; somente a mensagem da LATAM que oferece ajuda e solicita um dado de identidade libera o envio do motivo. Os passos seguintes ainda usam `any_inbound`. Se o menu da LATAM mudar, revise os matchers com `npm run workflow:edit`.
 
@@ -435,7 +434,7 @@ Por padrão, o servidor escuta somente em:
 http://127.0.0.1:3000
 ```
 
-Esse endereço só funciona na própria máquina. O próprio `npm start` verifica a rota `/health`, cria um Cloudflare Quick Tunnel e imprime a URL HTTPS completa que deve ser cadastrada no sistema externo.
+Esse endereço só funciona na própria máquina. O próprio `npm start` verifica a rota `/health`, cria um Cloudflare Quick Tunnel e imprime juntos a URL HTTPS, o token e o header `Authorization` completo que deve ser usado pelo sistema externo.
 
 Não altere `server.host` para `0.0.0.0`: o túnel acessa o servidor local diretamente, e manter o bind em `127.0.0.1` evita exposição desnecessária na rede local. O comando separado `npm run tunnel` permanece disponível apenas para diagnóstico manual.
 
@@ -473,18 +472,11 @@ Um trabalho novo normalmente retorna HTTP `202`. Repetir a mesma chave de idempo
 | `pnr` | Sim | Exatamente 6 letras/números; convertido para maiúsculas |
 | `currentName` | Sim | 1–100 caracteres de nome permitidos |
 | `correctName` | Sim | 1–100 caracteres de nome permitidos |
-| `ticket` | Sim, em multipart | PDF válido enviado como arquivo |
-| `ticketPdfBase64` | Sim, em JSON | PDF em Base64, com ou sem prefixo `data:application/pdf;base64,` |
-| `ticketFileName` | Não | Nome terminado em `.pdf`; padrão `bilhete-PNR.pdf` |
 | `requestId` | Não | Identificador opcional para deduplicação; omita para criar sempre um trabalho novo |
 
 Não é necessário enviar `Idempotency-Key` nem `requestId`. Quando ambos são omitidos, o servidor gera um identificador interno aleatório e cada POST válido cria um novo trabalho. Use `Idempotency-Key` apenas se desejar proteção opcional contra repetição acidental da mesma requisição.
 
-O PDF precisa começar com a assinatura `%PDF-`. O limite padrão é 16 MB. A rota reserva espaço para a expansão de aproximadamente 33% do Base64, mas esse formato consome mais memória; prefira multipart para arquivos maiores.
-
-### Exemplo curl — multipart
-
-macOS/Linux ou Git Bash:
+### Exemplo curl — somente dados
 
 ```bash
 TOKEN="$(npm run --silent token:show)"
@@ -492,77 +484,18 @@ TOKEN="$(npm run --silent token:show)"
 curl --fail-with-body \
   --request POST 'http://127.0.0.1:3000/api/jobs' \
   --header "Authorization: Bearer ${TOKEN}" \
-  --form 'pnr=QWEBZI' \
-  --form 'currentName=JANDELA' \
-  --form 'correctName=DANIELA' \
-  --form 'ticket=@/caminho/bilhete.pdf;type=application/pdf'
-```
-
-No Windows PowerShell também é possível usar `curl.exe` com os mesmos headers e opções `--form`.
-
-### Exemplo PowerShell 7 — multipart
-
-```powershell
-$token = ((npm run --silent token:show) | Select-Object -Last 1).Trim()
-$headers = @{
-    Authorization = "Bearer $token"
-}
-$form = @{
-    pnr = 'QWEBZI'
-    currentName = 'JANDELA'
-    correctName = 'DANIELA'
-    ticket = (Get-Item -LiteralPath 'C:\Bilhetes\bilhete.pdf')
-}
-
-$request = @{
-    Method = 'Post'
-    Uri = 'http://127.0.0.1:3000/api/jobs'
-    Headers = $headers
-    Form = $form
-}
-Invoke-RestMethod @request
-```
-
-O parâmetro `-Form` requer PowerShell 7. No Windows PowerShell 5.1, use `curl.exe` para multipart ou o exemplo JSON abaixo.
-
-### Exemplo curl — JSON com PDF em Base64
-
-Recomendado apenas para PDFs pequenos:
-
-```bash
-TOKEN="$(npm run --silent token:show)"
-PDF_BASE64="$(base64 < '/caminho/bilhete.pdf' | tr -d '\r\n')"
-
-curl --fail-with-body \
-  --request POST 'http://127.0.0.1:3000/webhooks/name-correction' \
-  --header "Authorization: Bearer ${TOKEN}" \
   --header 'Content-Type: application/json' \
-  --data-binary @- <<JSON
-{
-  "pnr": "QWEBZI",
-  "currentName": "JANDELA",
-  "correctName": "DANIELA",
-  "ticketFileName": "bilhete-QWEBZI.pdf",
-  "ticketPdfBase64": "${PDF_BASE64}"
-}
-JSON
-
-unset PDF_BASE64
+  --data '{"pnr":"QWEBZI","currentName":"JANDELA","correctName":"DANIELA"}'
 ```
 
-### Exemplo PowerShell — JSON com PDF em Base64
-
-Compatível com Windows PowerShell 5.1 e PowerShell 7:
+### Exemplo PowerShell — somente dados
 
 ```powershell
 $token = ((npm run --silent token:show) | Select-Object -Last 1).Trim()
-$pdfPath = 'C:\Bilhetes\bilhete.pdf'
 $body = @{
     pnr = 'QWEBZI'
     currentName = 'JANDELA'
     correctName = 'DANIELA'
-    ticketFileName = [IO.Path]::GetFileName($pdfPath)
-    ticketPdfBase64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($pdfPath))
 } | ConvertTo-Json -Compress
 
 $request = @{
@@ -600,10 +533,10 @@ O bot processa somente um trabalho ativo por conversa. Os seguintes permanecem e
 | `send_uncertain` | Não foi possível provar se o envio ocorreu | Revise o WhatsApp antes de escolher uma ação |
 | `failed` | O snapshot do trabalho não pôde iniciar | Investigue a configuração e cancele; não há retomada automática |
 | `manual_intervention` | Foi detectada mensagem própria que não pertence ao bot | Revise a conversa e use `resume-waiting` ou `cancel` |
-| `completed` | Houve resposta posterior ao PDF | Terminal; será removido após a retenção |
+| `completed` | O fluxo recebeu a confirmação final ou acionou uma regra terminal | Terminal; será removido após a retenção |
 | `cancelled` | Cancelado pelo operador | Terminal; será removido após a retenção |
 
-Uma queda durante `sending` é recuperada como `send_uncertain`. O bot não repete automaticamente PNR, nomes, confirmação ou PDF. Uma mensagem enviada manualmente pela conta conectada, na mesma conversa e durante um trabalho ativo, gera `manual_intervention`; mensagens cujo ID foi registrado como envio do próprio bot não causam essa pausa. Ao desconectar enquanto espera, o timeout do passo é reagendado na reconexão; o limite total do trabalho continua baseado na criação e pode vencer após uma desconexão longa.
+Uma queda durante `sending` é recuperada como `send_uncertain`. O bot não repete automaticamente PNR, nomes ou confirmação. Uma mensagem enviada manualmente pela conta conectada, na mesma conversa e durante um trabalho ativo, gera `manual_intervention`; mensagens cujo ID foi registrado como envio do próprio bot não causam essa pausa. Ao desconectar enquanto espera, o timeout do passo é reagendado na reconexão; o limite total do trabalho continua baseado na criação e pode vencer após uma desconexão longa.
 
 Liste os trabalhos:
 
@@ -754,13 +687,11 @@ Pare o outro serviço ou altere `server.port` no `config.json` privado mostrado 
 
 Obtenha novamente o token com `npm run token:show` e envie exatamente `Authorization: Bearer TOKEN`. Não inclua aspas, espaços extras ou o token de outra pasta local.
 
-### Webhook retorna 400 ou 413
+### Webhook retorna 400
 
 - confirme PNR com exatamente seis letras/números;
-- use `ticket` no multipart ou `ticketPdfBase64` no JSON;
-- confirme que o arquivo começa com `%PDF-` e termina em `.pdf`;
-- reduza o arquivo ou revise `server.maxUploadMb`;
-- lembre que Base64 aumenta o corpo; prefira multipart.
+- confirme que `currentName` e `correctName` contêm apenas caracteres permitidos de nome;
+- envie JSON com `pnr`, `currentName` e `correctName`.
 
 ### A primeira mensagem não foi enviada
 

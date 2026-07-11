@@ -122,7 +122,7 @@ test('cria trabalhos distintos quando Idempotency-Key e requestId não são envi
   assert.equal((await store.listJobs()).length, 2)
 })
 
-test('recusa PDF inválido ou ausente sem persistir trabalho', async (t) => {
+test('aceita somente os dados sem PDF e recusa um arquivo inválido quando enviado', async (t) => {
   const { appPaths, store, app } = await createHarness(t)
 
   const invalid = await request(app)
@@ -139,14 +139,14 @@ test('recusa PDF inválido ou ausente sem persistir trabalho', async (t) => {
     .expect(400)
   assert.match(invalid.body.error, /PDF válido/)
 
-  const missing = await request(app)
+  const dataOnly = await request(app)
     .post('/api/jobs')
     .set('Authorization', AUTHORIZATION)
-    .set('Idempotency-Key', 'webhook-missing-pdf')
     .send({ pnr: 'QWEBZI', currentName: 'JANDELA', correctName: 'DANIELA' })
-    .expect(400)
-  assert.match(missing.body.error, /Envie o PDF/)
+    .expect(202)
+  assert.equal(dataOnly.body.created, true)
+  assert.equal(dataOnly.body.job.currentStepId, 'reason')
 
-  assert.equal((await store.listJobs()).length, 0)
+  assert.equal((await store.listJobs()).length, 1)
   assert.deepEqual(await fs.readdir(appPaths.uploads), [])
 })

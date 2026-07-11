@@ -87,7 +87,7 @@ test('executa o fluxo completo em ordem e conclui somente após a resposta final
 
   assert.deepEqual(whatsapp.texts, ['Olá'])
 
-  for (let index = 1; index <= 6; index += 1) {
+  for (let index = 1; index <= 5; index += 1) {
     const result = await engine.handleInbound(inbound(`in-${index}`))
     assert.equal(result.accepted, true)
     assert.equal(result.completed, false)
@@ -101,15 +101,13 @@ test('executa o fluxo completo em ordem e conclui somente após a resposta final
     'DANIELA',
     'SIM',
   ])
-  assert.equal(whatsapp.documents.length, 1)
-  assert.equal(whatsapp.documents[0].options.fileName, 'bilhete-QWEBZI.pdf')
-  assert.equal(path.basename(whatsapp.documents[0].source), 'job-flow.pdf')
+  assert.equal(whatsapp.documents.length, 0)
 
   const waiting = await store.getJob('job-flow')
   assert.equal(waiting.status, 'waiting')
   assert.equal(waiting.workflow.steps[waiting.cursor].id, 'final_confirmation')
 
-  const final = await engine.handleInbound(inbound('in-7', TARGET_NUMBER, 'protocolo criado'))
+  const final = await engine.handleInbound(inbound('in-6', TARGET_NUMBER, 'protocolo criado'))
   assert.deepEqual(final, { accepted: true, completed: true, jobId: 'job-flow' })
   assert.equal((await store.getJob('job-flow')).status, 'completed')
 })
@@ -206,7 +204,7 @@ test('deduplica globalmente uma mensagem reapresentada em um trabalho posterior'
   const { appPaths, config, store, whatsapp, engine } = await createHarness(t)
   await engine.setConnected(true)
 
-  for (let index = 1; index <= 7; index += 1) {
+  for (let index = 1; index <= 6; index += 1) {
     await engine.handleInbound(inbound(`global-${index}`))
   }
   assert.equal((await store.getJob('job-flow')).status, 'completed')
@@ -228,7 +226,7 @@ test('deduplica globalmente uma mensagem reapresentada em um trabalho posterior'
   await engine.enqueue(second)
   const before = whatsapp.texts.length
 
-  const duplicate = await engine.handleInbound(inbound('global-7'))
+  const duplicate = await engine.handleInbound(inbound('global-6'))
 
   assert.deepEqual(duplicate, { accepted: false, reason: 'duplicate' })
   assert.equal(whatsapp.texts.length, before)

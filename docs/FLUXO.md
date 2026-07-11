@@ -1,12 +1,12 @@
 # Fluxo de correção de nome LATAM
 
-O arquivo `config/default.json` é o modelo público da conversa. Após o assistente inicial, a configuração ativa e editável fica no diretório privado do usuário (`%LOCALAPPDATA%\latam-name-correction-bot` no Windows ou `~/Library/Application Support/latam-name-correction-bot` no macOS). Ela reproduz a sequência mostrada no fluxo atual: `Olá`, motivo do contato, PNR, nome atual, nome correto, `SIM`, PDF do bilhete e espera pela confirmação final da LATAM.
+O arquivo `config/default.json` é o modelo público da conversa. Após o assistente inicial, a configuração ativa e editável fica no diretório privado do usuário (`%LOCALAPPDATA%\latam-name-correction-bot` no Windows ou `~/Library/Application Support/latam-name-correction-bot` no macOS). Ela reproduz a sequência mostrada no fluxo atual: `Olá`, motivo do contato, PNR, nome atual, nome correto, `SIM` e espera pela confirmação final da LATAM.
 
 ## Como a conversa começa
 
 Há dois tipos de evento, com responsabilidades diferentes:
 
-1. O webhook local cria um trabalho com os dados da correção e o PDF. A criação libera imediatamente o passo `hello`.
+1. O webhook local cria um trabalho com PNR, nome atual e nome correto. A criação libera imediatamente o passo `hello`.
 2. O socket do Baileys recebe as mensagens do WhatsApp. Somente mensagens novas do número configurado em `whatsapp.monitoredNumber` podem liberar os passos seguintes.
 
 O QR Code apenas autentica a conexão do WhatsApp; ele não cria um webhook. O servidor HTTP local recebe o trabalho, enquanto os eventos do socket conduzem a conversa.
@@ -19,12 +19,11 @@ Cada trabalho precisa fornecer estes campos:
 
 | Campo | Uso | Validação recomendada |
 | --- | --- | --- |
-| `pnr` | Conteúdo do passo `pnr` e nome do PDF | Obrigatório; inicialmente seis letras ou números (`^[A-Z0-9]{6}$`) |
+| `pnr` | Conteúdo do passo `pnr` | Obrigatório; inicialmente seis letras ou números (`^[A-Z0-9]{6}$`) |
 | `currentName` | Nome que consta atualmente no bilhete | Obrigatório; remover espaços externos sem modificar silenciosamente o conteúdo |
 | `correctName` | Nome correto que será solicitado | Obrigatório; remover espaços externos sem modificar silenciosamente o conteúdo |
-| `ticketPdf` | Arquivo enviado no passo `ticket_pdf` | Obrigatório enquanto o workflow contiver um passo `document`; assinatura `%PDF-` e tamanho são validados |
 
-As expressões `{{pnr}}`, `{{currentName}}` e `{{correctName}}` são substituídas no momento do envio. `ticketPdf` é referenciado por `sourceField`, não é interpolado como texto. Templates devem aceitar somente os campos permitidos; a configuração nunca deve executar JavaScript, comandos ou caminhos arbitrários.
+As expressões `{{pnr}}`, `{{currentName}}` e `{{correctName}}` são substituídas no momento do envio. Templates devem aceitar somente os campos permitidos; a configuração nunca deve executar JavaScript, comandos ou caminhos arbitrários.
 
 ## Sequência configurada
 
@@ -36,7 +35,6 @@ As expressões `{{pnr}}`, `{{currentName}}` e `{{correctName}}` são substituíd
 | `current_name` | Próxima resposta nova | Envia `{{currentName}}` |
 | `correct_name` | Próxima resposta nova | Envia `{{correctName}}` |
 | `confirmation` | Próxima resposta nova | Envia `SIM` |
-| `ticket_pdf` | Próxima resposta nova | Envia o arquivo indicado por `ticketPdf` |
 | `final_confirmation` | Próxima resposta nova | Encerra o trabalho com sucesso |
 
 A regra global `infant_agent_handoff` é avaliada em qualquer passo. Se uma mensagem contiver simultaneamente “Esta reserva inclui um passageiro menor de 2 anos (bebê)” e “Gostaria que eu conecte você com um agente especializado”, o bot envia `Sim` e conclui imediatamente o trabalho. PNR, nome e demais campos da mensagem não participam da correspondência e podem variar.
@@ -61,8 +59,6 @@ QUEUED
   -> SENDING_CORRECT_NAME
   -> WAITING_CONFIRMATION
   -> SENDING_CONFIRMATION
-  -> WAITING_TICKET_PDF_REQUEST
-  -> SENDING_TICKET_PDF
   -> WAITING_FINAL_CONFIRMATION
   -> COMPLETED
 ```
@@ -70,9 +66,9 @@ QUEUED
 Os estados persistidos laterais são `manual_intervention`, `timed_out`, `send_uncertain`, `failed` e `cancelled`. Durante uma desconexão, o trabalho permanece em `waiting`, mas o temporizador do passo é suspenso e reagendado ao reconectar.
 
 - Ao desconectar, o bot pausa a contagem do passo e não repete a última mensagem depois de reconectar.
-- Se o processo cair sem conseguir determinar se um envio ocorreu, deve usar `SEND_UNCERTAIN`; repetir automaticamente PNR, nomes, `SIM` ou PDF pode desalinhar a conversa.
+- Se o processo cair sem conseguir determinar se um envio ocorreu, deve usar `SEND_UNCERTAIN`; repetir automaticamente PNR, nomes ou `SIM` pode desalinhar a conversa.
 - Uma mensagem manual enviada pelo usuário no mesmo chat durante um trabalho deve pausá-lo para revisão.
-- `COMPLETED` só é alcançado depois de uma mensagem posterior ao PDF, não apenas pelo aceite local do upload.
+- `COMPLETED` é alcançado depois da confirmação final ou de uma regra condicional terminal.
 
 ## Matchers
 
@@ -138,8 +134,7 @@ Não faça reenvio automático de passos após timeout ou reconexão. O Baileys 
 - Para mudar a ordem, reordene objetos completos em `workflow.steps`.
 - Para adicionar um passo, use um `id` único e defina `await` e, quando aplicável, `send`.
 - O primeiro passo precisa usar `job_created`.
-- Deve haver apenas um passo terminal, colocado depois do envio do PDF.
-- `sourceField` deve apontar para um campo de arquivo permitido pelo servidor.
+- Deve haver apenas um passo terminal, colocado no final da sequência.
 - O arquivo é JSON puro e não aceita comentários.
 
 Valide a configuração inteira antes de abrir a conexão do WhatsApp. Uma alteração deve valer apenas para trabalhos novos; cada trabalho ativo preserva uma cópia da versão do fluxo com a qual começou. A troca do número monitorado exige o cancelamento explícito dos trabalhos pendentes. Antes de cada envio, o engine também compara o número do snapshot, da configuração ativa e do transporte; qualquer divergência bloqueia o envio.
@@ -148,8 +143,7 @@ Valide a configuração inteira antes de abrir a conexão do WhatsApp. Uma alter
 
 - O destino da mensagem sempre vem de `whatsapp.monitoredNumber`; o webhook não pode escolher outro número.
 - Mantenha o servidor em `127.0.0.1` por padrão. Se houver exposição externa, exija TLS e autenticação forte.
-- PNR, nomes, PDFs, tokens, banco local e credenciais do WhatsApp não podem ser versionados no Git.
+- PNR, nomes, tokens, banco local e credenciais do WhatsApp não podem ser versionados no Git.
 - Mascarar PNR e nomes nos logs reduz a exposição de dados pessoais.
-- Validar assinatura e tamanho do PDF; não aceitar caminho arbitrário informado por requisição remota. O MIME declarado pelo cliente não é tratado como prova.
 - O número deve ser comparado pelo JID canônico. Um alias LID só pode ser aceito depois de resolvido e associado ao mesmo número pela própria conexão.
 - Mudanças no menu da LATAM devem fazer o fluxo parar com segurança, não continuar enviando dados fora de contexto.

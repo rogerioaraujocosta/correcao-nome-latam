@@ -101,17 +101,6 @@
         }
       },
       {
-        "id": "ticket_pdf",
-        "await": {
-          "mode": "any_inbound"
-        },
-        "send": {
-          "kind": "document",
-          "sourceField": "ticketPdf",
-          "fileName": "bilhete-{{pnr}}.pdf"
-        }
-      },
-      {
         "id": "final_confirmation",
         "await": {
           "mode": "any_inbound"

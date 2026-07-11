@@ -35,7 +35,6 @@ test('a configuração padrão descreve exatamente o fluxo atual', async () => {
       'current_name',
       'correct_name',
       'confirmation',
-      'ticket_pdf',
       'final_confirmation',
     ],
   )
@@ -51,7 +50,6 @@ test('a configuração padrão descreve exatamente o fluxo atual', async () => {
     'Preciso corrigir uma letra de um nome na reserva',
   )
   assert.equal(config.workflow.steps[5].send.value, 'SIM')
-  assert.equal(config.workflow.steps[6].send.sourceField, 'ticketPdf')
   assert.equal(config.workflow.steps.at(-1).terminal, 'success')
 })
 
